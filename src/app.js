@@ -1,0 +1,310 @@
+/* Standalone UI. No backend, login, analytics or hidden network writes. */
+(() => {
+  'use strict';
+  const M=globalThis.TripModel;
+  const KEY='trip-together.osaka.2026.v1',ACTOR_KEY=KEY+'.actor';
+  const $=s=>document.querySelector(s);
+  const e=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const paths={
+    plane:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',board:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',list:'<path d="M9 5h12M9 12h12M9 19h12"/><circle cx="4" cy="5" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="19" r="1"/>',map:'<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2Z"/><path d="M9 3v16M15 5v16"/>',pin:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',heart:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',star:'<path d="m12 3 2.8 5.7 6.3.9-4.5 4.4 1.1 6.3L12 17.3l-5.7 3 1.1-6.3L3 9.6l6.2-.9Z"/>',plus:'<path d="M12 5v14M5 12h14"/>',chevron:'<path d="m9 5 7 7-7 7"/>',down:'<path d="m5 9 7 7 7-7"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',check:'<path d="m5 12 4 4L19 6"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',users:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"/>',gear:'<path d="m9 3-.7 3-2.6 1.5-3 .8 1 3-.1 3 2.9.9L9 18l.5 3h5l.6-3 2.6-1.6 2.9-.9-.1-3 1-3-3-.8L16 6l-.7-3Z"/><circle cx="12" cy="12" r="3"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',unlock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8-1"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',wallet:'<path d="M20 8H5a2 2 0 0 1 0-4h13v4M4 6v14h17V8"/><path d="M21 12h-6v4h6"/>',coffee:'<path d="M4 9h12v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4ZM16 9h2a3 3 0 1 1 0 6h-2M6 3v2M10 2v3M14 3v2M2 22h18"/>',meal:'<path d="M4 3v6a3 3 0 0 0 6 0V3M7 3v19M17 3v19M17 3c-3 3-3 8 0 8h3V3"/>',sight:'<path d="M3 21h18M5 21V10M19 21V10M3 10l9-6 9 6ZM9 21v-6h6v6M12 4V1"/>',shopping:'<path d="M4 7h16l1 14H3ZM8 7V5a4 4 0 0 1 8 0v2"/>',activity:'<path d="M8 7h8a5 5 0 0 1 5 4l1 6a3 3 0 0 1-5 3l-3-2h-4l-3 2a3 3 0 0 1-5-3l1-6a5 5 0 0 1 5-4Z"/><path d="M7 11v4M5 13h4M16 12h.1M18 15h.1"/>',drink:'<path d="M5 3h14l-7 9ZM12 12v9M7 21h10"/>',night:'<path d="M21 13A9 9 0 0 1 11 3a9 9 0 1 0 10 10Z"/>',other:'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/>',message:'<path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3Z"/>',external:'<path d="M14 3h7v7M10 14 21 3M21 14v7H3V3h7"/>',download:'<path d="M12 3v12m-5-5 5 5 5-5M3 16v5h18v-5"/>',upload:'<path d="M12 16V4m-5 5 5-5 5 5M3 16v5h18v-5"/>',search:'<circle cx="10.5" cy="10.5" r="7"/><path d="m16 16 5 5"/>',shield:'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z"/><path d="m8 12 3 3 5-6"/>',cloud:'<path d="M7 15H5a4 4 0 0 1-1-8 6 6 0 0 1 11-2 5 5 0 1 1 4 10M8 18l-1 3M13 17l-1 3M18 18l-1 3"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1 1M18 18l1 1M5 19l1-1M18 6l1-1"/>',edit:'<path d="m15 4 5 5M3 21l5-1L21 7a3.5 3.5 0 0 0-5-5L3 15Z"/>',trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',arrow:'<path d="M3 12h17m-6-6 6 6-6 6"/>',hotel:'<path d="M3 21V3h13v18M16 8h5v13M1 21h22M7 7h1M11 7h1M7 11h1M11 11h1M8 21v-5h4v5"/>'
+  };
+  const icon=(name,small=false)=>`<svg class="icon${small?' sm':''}" viewBox="0 0 24 24" aria-hidden="true">${paths[name]||paths.other}</svg>`;
+  const btn=(label,action,attrs='',kind='secondary')=>`<button type="button" class="btn ${kind}" data-action="${action}" ${attrs}>${label}</button>`;
+  const link=(url,label,cls='map-link')=>`<a class="${cls}" href="${e(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+  const DAYS=[{id:'2026-11-06',num:'06',day:'FRI',ko:'금요일'},{id:'2026-11-07',num:'07',day:'SAT',ko:'토요일'},{id:'2026-11-08',num:'08',day:'SUN',ko:'일요일'}];
+  const STATUS={collect:'후보 모집 중',vote:'투표 중',final:'일정 확정'};
+  const WEATHER={any:'날씨 무관',indoor:'실내',outdoor:'야외'};
+  let state,savedRaw=null,storageIssue='',corruptRaw='',actor='p1',demo=false;
+  let modal=null,confirmHandler=null,toastTimer,mapInstance=null,leafletPromise=null,renderSerial=0;
+  const ui={view:'board',day:DAYS[0].id,expanded:new Set(),more:new Set(),query:'',category:'all',filterDay:'all',weather:'all',mapMode:'confirmed',travelmode:'transit'};
+  function readState(){
+    try{
+      savedRaw=localStorage.getItem(KEY);
+      if(savedRaw){try{state=M.validate(JSON.parse(savedRaw));}catch(err){corruptRaw=savedRaw;storageIssue='저장된 데이터에 오류가 있어 자동 저장을 중지했어요. 설정에서 원본을 백업한 뒤 초기화해주세요.';state=M.create();return;}}
+      else state=M.create();
+      localStorage.setItem(KEY+'.storage-test','1');localStorage.removeItem(KEY+'.storage-test');storageIssue='';corruptRaw='';
+    }catch{state=M.create();storageIssue='브라우저가 저장을 허용하지 않아요. 닫기 전에 JSON 백업을 다운로드해주세요.';}
+  }
+  readState();try{actor=sessionStorage.getItem(ACTOR_KEY)||'p1';}catch{}
+  if(!state.participants.some(p=>p.id===actor))actor='p1';
+  const person=id=>state.participants.find(p=>p.id===id);
+  const name=id=>person(id)?.name||'여행자';
+  const day=()=>state.days.find(d=>d.id===ui.day);
+  const meta=id=>DAYS.find(d=>d.id===id);
+  const slotMeta=id=>M.SLOTS.find(s=>s.id===id);
+  const byId=id=>state.candidates.find(c=>c.id===id);
+  const candidates=(d,s)=>state.candidates.filter(c=>c.dayId===d&&c.slotId===s);
+  const shortDate=id=>`11.${Number(meta(id).num)}`;
+  const money=value=>value===null?'비용 미입력':value===0?'무료':'¥'+new Intl.NumberFormat('ja-JP').format(value);
+  const duration=value=>value===null?'시간 미입력':value>=60?`${Math.floor(value/60)}시간${value%60?' '+value%60+'분':''}`:value+'분';
+  const avatar=id=>`<span class="avatar ${e(id)}" aria-hidden="true">${e(name(id).startsWith('여행자 ')?name(id).slice(-1):Array.from(name(id))[0])}</span>`;
+  function toast(text){const t=$('#toast');t.textContent=text;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),4000);}
+  function commit(actions,message='저장했어요.'){
+    try{
+      if(!demo&&corruptRaw)throw new Error('오류가 있는 원본을 보호하고 있어요. 설정에서 원본 백업 후 초기화해주세요.');
+      if(!demo){
+        let latest;try{latest=localStorage.getItem(KEY);}catch{latest=savedRaw;}
+        if(latest!==savedRaw){
+          state=latest?M.validate(JSON.parse(latest)):M.create();savedRaw=latest;render();
+          throw new Error('다른 탭에서 수정된 내용을 불러왔어요. 변경 사항을 확인한 뒤 다시 시도해주세요.');
+        }
+      }
+      let next=state;for(const a of (Array.isArray(actions)?actions:[actions]))next=M.change(next,a,actor);
+      state=next;
+      if(!demo){
+        try{const raw=JSON.stringify(state);localStorage.setItem(KEY,raw);savedRaw=raw;storageIssue='';}
+        catch{storageIssue='저장 공간 부족 또는 브라우저 제한으로 자동 저장에 실패했어요. 닫기 전에 JSON 백업을 다운로드해주세요.';}
+      }
+      render();if(message)toast(storageIssue&&!demo?'현재 화면에만 반영됐어요. JSON 백업을 다운로드해주세요.':message);return true;
+    }catch(err){showError(err.message||'변경을 저장하지 못했어요.');return false;}
+  }
+  function showError(text){const box=$('#panel-dialog[open] .form-error');if(box){box.textContent=text;box.scrollIntoView({block:'nearest'});}toast(text);}
+  function brand(){return `<div class="brand"><span class="brand-symbol">${icon('plane')}</span><div class="brand-name">trip together</div></div>`;}
+  function navButton(view,label,glyph){return `<button type="button" data-action="navigate" data-view="${view}" class="${ui.view===view?'active':''}" ${ui.view===view?'aria-current="page"':''}>${icon(glyph)}<span>${label}</span>${view==='candidates'?`<span class="nav-count">${state.candidates.length||''}</span>`:''}</button>`;}
+  function sidebar(){return `<aside class="sidebar">${brand()}<div class="sidebar-trip"><div class="eyebrow">함께 만드는 여행</div><h2>우리들의 오사카</h2><p>2026.11.06 — 11.08 · 5명</p></div><nav class="side-nav" aria-label="주 메뉴">${navButton('board','일정 보드','board')}${navButton('candidates','후보 모아보기','list')}${navButton('map','지도 · 동선','map')}${navButton('mine','내 투표','heart')}</nav><div class="sidebar-bottom"><div class="side-note">${icon('heart')}<strong>마음에 드는 곳은 여러 곳에</strong>투표는 자유롭게, 꼭 가고 싶은<br>3곳에는 PICK을 남겨 주세요.</div><div class="side-footer">다섯 명이 함께 만드는 오사카 여행</div></div></aside>`;}
+  function topbar(){return `<header class="topbar"><div class="breadcrumb">우리의 여행 ${icon('chevron',true)} <b>오사카 2026</b></div><div class="mobile-brand">${brand()}</div><div class="top-actions">${btn(icon('plus',true)+' 후보 추가','add','','primary')}<button type="button" class="profile-btn" data-action="participants" aria-label="현재 참여자 ${e(name(actor))}, 참여자 바꾸기">${avatar(actor)}<span class="profile-name">${e(name(actor))}</span>${icon('down',true)}</button><button type="button" class="icon-btn" data-action="settings" aria-label="보드 설정 및 백업">${icon('gear')}</button></div></header><div class="local-notice"><span>${icon('shield',true)}이 브라우저에 저장 · 다른 기기와 실시간 공유되지 않아요</span><button type="button" class="text-btn" data-action="settings">백업 · 공유 ${icon('chevron',true)}</button></div>${demo?`<div class="demo-notice"><span><b>샘플 체험 중</b> · 장소·위치·비용·투표는 기능 설명용 예시예요. 내 보드와 분리되어 있어요.</span><button type="button" class="text-btn" data-action="exit-demo">내 보드로 돌아가기</button></div>`:''}${storageIssue&&!demo?`<div class="storage-notice" role="alert">${e(storageIssue)}<button type="button" class="text-btn" data-action="settings">설정</button></div>`:''}`;}
+  function hero(){
+    const confirmed=state.days.reduce((total,d)=>total+d.slots.filter(s=>s.enabled&&s.confirmedId).length,0);
+    return `<section class="hero" aria-label="오사카 여행 소개">
+      <div class="hero-main"><div class="hero-copy"><div class="eyebrow">우리의 다음 여행</div>
+        <h1>다섯 명이 만드는<br><span>우리의 오사카</span></h1></div>
+        <div class="hero-art" aria-hidden="true"><div class="trip-orbit"></div><div class="trip-case"><span class="case-handle"></span><span class="case-line"></span><span class="case-line"></span><span class="case-sticker">${icon('plane')}</span></div><span class="case-pin">${icon('pin')}</span><span class="case-check">${icon('check')}</span></div>
+      </div>
+      <div class="hero-meta">${icon('calendar',true)}<span>2026.11.06 — 11.08</span><i class="dot"></i><span>2박 3일 · 5명</span></div>
+      <div class="hero-footer"><div class="hero-stat">함께 모은 후보<b>${state.candidates.length}<span>개</span></b></div><div class="hero-stat">확정한 일정<b>${confirmed}<span>개</span></b></div><button type="button" class="text-btn" data-action="navigate" data-view="candidates">후보 보기 ${icon('chevron',true)}</button></div>
+    </section>`;
+  }
+  function dateBar(){return `<div class="date-bar"><div class="date-tabs" role="group" aria-label="여행 날짜 선택">${DAYS.map((d,i)=>`<button type="button" class="date-tab ${ui.day===d.id?'active':''}" data-action="date" data-day="${d.id}" aria-pressed="${ui.day===d.id}"><div class="day">${i+1}일차</div><div class="date">11.${d.num}<span>${d.ko.slice(0,1)}</span></div>${state.days[i].locked?`<span class="tab-dot" title="잠긴 일정"></span>`:''}</button>`).join('')}</div><div class="date-extra">함께 계획하고 있어요<div class="members"><div class="avatar-stack">${state.participants.map(p=>avatar(p.id)).join('')}</div><button type="button" class="text-btn" data-action="participants">참여자 5명 ${icon('chevron',true)}</button></div></div></div>`;}
+  function card(c,rank=0,tied=false){
+    const d=state.days.find(d=>d.id===c.dayId),s=d.slots.find(s=>s.id===c.slotId),selected=c.votes.includes(actor),picked=c.picks.includes(actor);
+    return `<article class="candidate" data-candidate-id="${e(c.id)}"><div class="candidate-head"><div class="category-art ${e(c.category)}">${icon(c.category)}${c.photoUrl?`<img src="${e(c.photoUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</div><div class="candidate-main"><div class="candidate-tags">${rank?`<span class="rank rank${rank}">${rank<=3?['','🥇','🥈','🥉'][rank]:''} ${tied?'공동 ':''}${rank}위</span>`:'<span>투표를 기다려요</span>'}<span>·</span><span>${e(M.CATEGORIES[c.category])}</span>${s.rainId===c.id?'<span class="badge gray">☂ 대체 후보</span>':''}</div><button type="button" class="candidate-title" data-action="detail" data-id="${e(c.id)}">${e(c.title)}</button>${c.description?`<p class="candidate-desc">${e(c.description)}</p>`:''}<div class="candidate-facts"><span>${icon('wallet')}${money(c.cost)}</span>${c.duration!==null?`<span>${icon('clock')}${duration(c.duration)}</span>`:''}<span>${c.weather==='outdoor'?icon('sun'):c.weather==='indoor'?icon('hotel'):icon('cloud')}${WEATHER[c.weather]}</span>${c.reservation?'<span>예약 필요</span>':''}</div></div></div><div class="candidate-controls"><div class="vote-group"><button type="button" class="vote-btn ${selected?'selected':''}" data-action="vote" data-id="${e(c.id)}" aria-label="${e(c.title)} 투표${selected?' 취소':''}" aria-pressed="${selected}" ${d.locked?'disabled':''}>${icon('heart')}<b>${c.votes.length}</b><span>${selected?'투표했어요':'투표'}</span></button><button type="button" class="pick-btn ${picked?'selected':''}" data-action="pick" data-id="${e(c.id)}" aria-label="${e(c.title)} 꼭 가고 싶음${picked?' 취소':''}" aria-pressed="${picked}" ${d.locked?'disabled':''}>${icon('star')}<span>PICK${c.picks.length?' '+c.picks.length:''}</span></button></div>${link(c.mapsUrl||M.searchUrl(c.title,c.address),icon('pin')+'Google 지도 '+icon('external'))}</div><div class="voter-names">${c.votes.length?'♥ '+c.votes.map(id=>e(name(id))).join(' · '):'좋아 보이는 후보에 마음을 남겨주세요.'}${c.comments.length?` · 댓글 ${c.comments.length}개`:''}</div>${c.picks.length?`<div class="pick-names">★ ${c.picks.map(id=>e(name(id))).join(' · ')}의 꼭 가고 싶은 곳</div>`:''}</article>`;
+  }
+  function slotView(s){
+    const m=slotMeta(s.id),cs=candidates(ui.day,s.id),confirmed=byId(s.confirmedId),rain=byId(s.rainId),ranked=M.rank(cs),open=ui.expanded.has(s.id),group=m.period==='저녁'?'night':m.period==='낮'?'pm':'';
+    const other=ranked.filter(r=>r.candidate.id!==s.confirmedId),top=ranked.slice(0,3).filter(r=>r.candidate.id!==s.confirmedId),rest=ranked.slice(3).filter(r=>r.candidate.id!==s.confirmedId);
+    const summary=confirmed?`<p class="slot-preview">✓ ${e(confirmed.title)}</p>`:cs.length?`<p>후보 ${cs.length}개 · 함께 골라 주세요</p>`:'<p>첫 후보를 추가해 주세요</p>';
+    return `<section class="slot ${open?'open':''}" id="slot-${s.id}"><div class="slot-summary"><span class="slot-glyph ${group}" aria-hidden="true">${m.icon}</span><button type="button" class="slot-label" data-action="slot-toggle" data-slot="${s.id}" aria-expanded="${open}" aria-controls="slot-body-${s.id}"><h3>${m.label}<span class="time">${s.start}–${s.end}</span></h3>${summary}</button><div class="slot-right">${confirmed?'<span class="badge">확정</span>':cs.length?'<span class="badge orange">후보 '+cs.length+'</span>':''}<button type="button" class="${cs.length?'icon-btn':'slot-add'}" data-action="${cs.length?'slot-toggle':'add'}" data-slot="${s.id}" aria-label="${m.label} ${cs.length?'후보 펼치기':'후보 추가'}" ${!cs.length&&day().locked?'disabled':''}>${icon(cs.length?'down':'plus',true)}</button></div></div>${open?`<div class="slot-body" id="slot-body-${s.id}">${confirmed?`<div class="confirmed-label">${icon('check')}우리가 선택한 일정</div><div class="confirmed-box">${card(confirmed,ranked.find(r=>r.candidate.id===confirmed.id)?.rank||0,ranked.find(r=>r.candidate.id===confirmed.id)?.tied)}${rain?`<div class="rain-text">☂ 비가 오면 <button type="button" class="text-btn" data-action="detail" data-id="${e(rain.id)}">${e(rain.title)}</button></div>`:''}</div>${other.length?'<div class="other-label">다른 후보도 살펴봐요</div>':''}`:''}${!cs.length?'<div class="empty-slot">맛집, 산책, 쇼핑… 어떤 아이디어든 좋아요.</div>':''}${top.map(r=>card(r.candidate,r.rank,r.tied)).join('')}${rest.length?`<details class="other-candidates" data-more="${s.id}" ${ui.more.has(s.id)?'open':''}><summary>그 외 후보 ${rest.length}개 더 보기</summary>${rest.map(r=>card(r.candidate,r.rank,r.tied)).join('')}</details>`:''}${btn(icon('plus',true)+' 이 시간대에 후보 추가','add',`data-slot="${s.id}" ${day().locked?'disabled':''}`,'full')}${s.transfer?`<p class="field-help" style="margin-top:10px">이전 장소에서 이동: ${e(s.transfer)}</p>`:''}</div>`:''}</section>`;
+  }
+  function aside(){
+    const d=day(),enabled=d.slots.filter(s=>s.enabled),confirmed=enabled.filter(s=>s.confirmedId).length,cs=state.candidates.filter(c=>c.dayId===ui.day&&enabled.some(s=>s.id===c.slotId)),b=M.budget(state,ui.day);
+    return `<aside class="board-aside"><section class="aside-card"><h3>${icon('check')}조금씩 완성되는 하루</h3><div class="progress-label"><strong>${confirmed} <span>/ ${enabled.length}</span></strong><span>일정 확정</span></div><div class="progress-track" role="progressbar" aria-label="오늘 일정 확정률" aria-valuenow="${confirmed}" aria-valuemin="0" aria-valuemax="${enabled.length||1}"><span style="width:${enabled.length?confirmed/enabled.length*100:0}%"></span></div><div class="aside-stats"><span>함께 모은 후보 <b>${cs.length}</b></span><span>남겨진 투표 <b>${cs.reduce((a,c)=>a+c.votes.length,0)}</b></span></div></section><section class="aside-card budget-card"><h3>${icon('wallet')}오늘의 예상 비용</h3><div class="budget-amount">${b.count?'¥'+new Intl.NumberFormat('ja-JP').format(b.total):'—'} <small>/ 1인</small></div><p class="budget-note">확정 일정에 입력한 비용만 합산해요.<br>${b.unknown?`미입력 ${b.unknown}곳은 합계에 포함되지 않았어요.`:'교통 · 항공 · 숙박비는 별도예요.'}</p></section><section class="aside-card bookings"><h3>${icon('list')}여행의 기본 정보</h3><div class="booking-line">${icon('plane')}<div><strong>항공편</strong><p>${e(state.bookings.flights||'예약한 항공편을 여기에 남겨요')}</p></div><button type="button" class="icon-btn" data-action="bookings" aria-label="항공편 정보 수정">${icon('chevron',true)}</button></div><div class="booking-line">${icon('hotel')}<div><strong>우리의 숙소</strong><p>${e(state.bookings.hotel||'숙소 이름과 체크인 시간을 남겨요')}</p></div><button type="button" class="icon-btn" data-action="bookings" aria-label="숙소 정보 수정">${icon('chevron',true)}</button></div></section><p class="little-note">${icon('star')}<b>이곳만큼은 꼭!</b><br>여행 전체에서 3곳에 PICK을 남겨요.<br>투표는 여러 후보에 자유롭게 할 수 있어요.</p></aside>`;
+  }
+  function board(){
+    const d=day(),disabled=d.slots.filter(s=>!s.enabled).length;
+    return `${hero()}${dateBar()}<div class="board-layout"><div class="board-content"><div class="section-head"><div><h2>11월 ${Number(meta(ui.day).num)}일 ${meta(ui.day).ko}</h2><p>오늘의 빈칸을 우리 취향으로 채워봐요.</p></div><div class="section-actions"><span class="badge ${d.status==='final'?'':'orange'}">${d.locked?icon('lock',true):''}${STATUS[d.status]}</span>${btn(icon('gear',true)+' 시간대 설정','day','','secondary')}</div></div>${d.locked?'<div class="info-box">이 날짜는 잠겨 있어요. 후보·투표·댓글 변경은 시간대 설정에서 잠금을 해제한 뒤 할 수 있어요.</div>':''}${['아침','낮','저녁'].map((period,i)=>{const slots=d.slots.filter(s=>s.enabled&&slotMeta(s.id).period===period);return slots.length?`<section class="period"><h3 class="period-title">${period}<span>${['SLOW MORNING','AFTERNOON WANDER','GOOD EVENING'][i]}</span></h3>${slots.map(slotView).join('')}</section>`:''}).join('')}${!d.slots.some(s=>s.enabled)?`<div class="empty-state"><div class="empty-art">${icon('calendar')}</div><h3>오늘 사용할 시간대를 켜주세요</h3><p>첫날과 마지막 날은 비행 일정에 맞춰 조절할 수 있어요.</p>${btn('시간대 설정','day')}</div>`:''}${disabled?`<button type="button" class="disabled-slots btn full" data-action="day">사용하지 않는 시간대 ${disabled}개 · 설정에서 다시 켤 수 있어요</button>`:''}${!state.candidates.length?`<div class="little-note" style="text-align:center;margin:15px 0">완성된 화면이 궁금한가요? <button type="button" class="text-btn" data-action="demo">샘플로 둘러보기 ${icon('arrow',true)}</button></div>`:''}</div>${aside()}</div><div class="board-foot">MORE THAN AN ITINERARY. OUR NEXT MEMORY.</div>`;
+  }
+  function candidateTile(c){const rank=M.rank(candidates(c.dayId,c.slotId)).find(r=>r.candidate.id===c.id);const d=state.days.find(d=>d.id===c.dayId),s=d.slots.find(s=>s.id===c.slotId);return `<div class="candidate-tile"><div class="tile-context"><span>${shortDate(c.dayId)} ${slotMeta(c.slotId).label}${!s.enabled?' · 비활성 시간대':''}</span><span>${s.confirmedId===c.id?'✓ 확정 · ':''}${e(name(c.authorId))}의 제안</span></div>${card(c,rank.rank,rank.tied)}</div>`;}
+  function candidatesPage(){return `<div class="page-title"><div class="eyebrow muted">THE IDEA COLLECTION</div><h1>우리의 가고 싶은 곳</h1><p>누군가의 취향이 모두의 새로운 발견이 될지도.</p></div><div class="filters"><label class="search-box">${icon('search')}<input id="candidate-search" type="search" placeholder="장소, 설명, 제안자로 검색" value="${e(ui.query)}" aria-label="후보 검색"></label><select class="filter-select" id="filter-day" aria-label="후보 날짜 필터"><option value="all">모든 날짜</option>${DAYS.map(d=>`<option value="${d.id}" ${ui.filterDay===d.id?'selected':''}>${shortDate(d.id)} ${d.ko}</option>`).join('')}</select><select class="filter-select" id="filter-weather" aria-label="날씨 필터"><option value="all">모든 날씨</option>${Object.entries(WEATHER).map(([v,l])=>`<option value="${v}" ${ui.weather===v?'selected':''}>${l}</option>`).join('')}</select></div><div class="filter-chips" role="group" aria-label="후보 카테고리">${[['all','전체'],...Object.entries(M.CATEGORIES)].map(([v,l])=>`<button type="button" class="chip ${ui.category===v?'active':''}" data-action="category" data-category="${v}" aria-pressed="${ui.category===v}">${l}</button>`).join('')}</div><div id="candidate-results">${candidateResults()}</div>`;}
+  function candidateResults(){const q=ui.query.trim().toLocaleLowerCase(),cs=state.candidates.filter(c=>(ui.filterDay==='all'||ui.filterDay===c.dayId)&&(ui.category==='all'||ui.category===c.category)&&(ui.weather==='all'||ui.weather===c.weather)&&(!q||[c.title,c.address,c.description,name(c.authorId)].join(' ').toLocaleLowerCase().includes(q))).sort((a,b)=>b.votes.length-a.votes.length||a.createdAt.localeCompare(b.createdAt));return cs.length?`<p class="field-help" style="margin-bottom:12px">후보 ${cs.length}개 · 표 수순 / 카드의 순위는 같은 날짜·시간대 기준이에요.</p><div class="candidates-grid">${cs.map(candidateTile).join('')}</div>`:`<div class="empty-state"><div class="empty-art">${icon('pin')}</div><h3>${state.candidates.length?'검색에 맞는 후보가 없어요':'아직 모아둔 곳이 없어요'}</h3><p>${state.candidates.length?'검색어나 필터를 바꿔서 다시 찾아보세요.':'괜찮아 보이는 곳을 발견하면, 여기에 남겨주세요.<br>작은 아이디어부터 시작해도 좋아요.'}</p>${state.candidates.length?btn('필터 초기화','clear-filters'):btn(icon('plus',true)+' 첫 후보 남기기','add','','primary')}</div>`;}
+  function mine(){const votes=state.candidates.filter(c=>c.votes.includes(actor)),picks=state.candidates.filter(c=>c.picks.includes(actor)),own=state.candidates.filter(c=>c.authorId===actor);return `<div class="page-title"><div class="eyebrow muted">A TRIP THAT FEELS LIKE YOU</div><h1>내 마음이 향하는 곳</h1><p>투표와 PICK, 내가 제안한 아이디어를 한눈에.</p></div><div class="my-banner">${avatar(actor)}<div><h3>${e(name(actor))}님의 여행 취향</h3><p>여러 후보에 투표할 수 있어요. 같은 후보에는 한 표씩!</p></div><div class="pick-budget"><b>${picks.length}<span style="font-size:14px;opacity:.5"> / 3</span></b>나의 PICK</div></div><h2 class="list-heading">${icon('star')}꼭 가고 싶은 곳 <small>${picks.length}곳</small></h2>${picks.length?`<div class="candidates-grid">${picks.map(candidateTile).join('')}</div>`:'<div class="inline-empty">후보 카드의 ☆ PICK을 눌러보세요. 여행 전체에서 3곳까지!</div>'}<h2 class="list-heading">${icon('heart')}내가 투표한 곳 <small>${votes.length}곳</small></h2>${votes.length?`<div class="candidates-grid">${votes.map(candidateTile).join('')}</div>`:`<div class="empty-state"><div class="empty-art">${icon('heart')}</div><h3>마음에 드는 곳을 찾아볼까요?</h3><p>후보를 살펴보고, 함께 가고 싶은 곳에 투표해요.</p>${btn('후보 모아보기','navigate','data-view="candidates"')}</div>`}<h2 class="list-heading">${icon('plane')}내가 제안한 곳 <small>${own.length}곳</small></h2>${own.length?`<div class="candidates-grid">${own.map(candidateTile).join('')}</div>`:'<div class="inline-empty">나만 알고 있던 그곳, 첫 아이디어를 나눠주세요.</div>'}`;}
+  function mapPage(){const route=M.route(state,ui.day,ui.mapMode),coords=route.filter(r=>r.candidate.lat!==null),missing=route.length-coords.length;return `<div class="page-title"><div class="eyebrow muted">CONNECT THE LITTLE MOMENTS</div><h1>한눈에 보는 우리의 동선</h1><p>가고 싶은 곳들 사이, 함께 걸어갈 길을 살펴봐요.</p></div>${dateBar()}<div class="map-controls"><div class="segmented" role="group" aria-label="지도에 표시할 후보"><button type="button" data-action="map-mode" data-mode="confirmed" class="${ui.mapMode==='confirmed'?'active':''}" aria-pressed="${ui.mapMode==='confirmed'}">확정 일정</button><button type="button" data-action="map-mode" data-mode="leaders" class="${ui.mapMode==='leaders'?'active':''}" aria-pressed="${ui.mapMode==='leaders'}">확정 + 상위 후보</button></div><select class="filter-select" id="travel-mode" aria-label="길찾기 교통수단"><option value="transit" ${ui.travelmode==='transit'?'selected':''}>대중교통</option><option value="walking" ${ui.travelmode==='walking'?'selected':''}>도보</option><option value="driving" ${ui.travelmode==='driving'?'selected':''}>자동차</option></select></div><div class="map-panel" id="trip-map"><div class="map-placeholder">${icon('map')}<p>${coords.length?'지도를 불러오고 있어요.':route.length?'장소 좌표를 추가하면 여기에 핀이 표시돼요.<br>아래 목록의 Google 지도 연결은 바로 사용할 수 있어요.':'아직 표시할 일정이 없어요.<br>후보를 확정하거나 상위 후보 보기를 선택해보세요.'}</p></div></div><p class="map-caption">지도는 OpenStreetMap을 사용해요. 연결선은 방문 순서이며 실제 도로·이동 경로가 아니에요. 이동시간은 아래 Google 길찾기에서 확인해주세요.${missing?`<br>좌표 미입력 ${missing}곳은 핀에서 제외되지만 일정 목록에는 표시돼요.`:''}${ui.mapMode==='leaders'?'<br>미확정 시간대는 1표 이상 받은 1위 후보를 표시해요. 공동 1위는 먼저 등록된 후보가 대표로 표시돼요.':''}</p><div class="routes">${route.map((r,i)=>`${i?`<div class="route-transfer">${icon('arrow')}${link(M.directionsUrl(route[i-1].candidate,r.candidate,ui.travelmode),'Google에서 이동시간 확인 '+icon('external'))}${r.slot.transfer?`<span>· 메모: ${e(r.slot.transfer)}</span>`:''}</div>`:''}<article class="route-card"><span class="route-num">${r.index}</span><div class="route-text"><small>${r.slot.start}–${r.slot.end} · ${slotMeta(r.slot.id).label}</small><h3>${e(r.candidate.title)}</h3><p>${r.slot.confirmedId===r.candidate.id?'확정 일정':'상위 후보 · 미확정'}${r.candidate.lat===null?' · 좌표 미입력':''}</p></div><button type="button" class="btn secondary small" data-action="detail" data-id="${e(r.candidate.id)}">자세히 ${icon('chevron',true)}</button></article>`).join('')}</div>`;}
+  function bottomNav(){return `<nav class="bottom-nav" aria-label="모바일 주 메뉴">${navButton('board','일정','board')}${navButton('candidates','후보','list')}<button type="button" class="nav-add" data-action="add" aria-label="일정 후보 추가">${icon('plus')}<span>추가</span></button>${navButton('map','지도','map')}${navButton('mine','내 투표','heart')}</nav>`;}
+  function render(){
+    if(mapInstance){mapInstance.remove();mapInstance=null;}
+    const focus=document.activeElement,focusId=focus?.id;
+    const focusKeys=focus?.dataset?Object.fromEntries(Object.entries(focus.dataset)):null;
+    const serial=++renderSerial;
+    $('#app').innerHTML=`${sidebar()}<div class="app-main">${topbar()}<main id="main">${({board,candidates:candidatesPage,map:mapPage,mine}[ui.view]||board)()}</main></div>${bottomNav()}`;
+    if(!$('#panel-dialog').open){
+      const replacement=(focusId&&document.getElementById(focusId))||(focusKeys?.action&&[...document.querySelectorAll('[data-action]')].find(b=>b.getClientRects().length&&Object.entries(focusKeys).every(([k,v])=>b.dataset[k]===v)));
+      replacement?.focus({preventScroll:true});
+    }
+    if(ui.view==='map')requestAnimationFrame(()=>initMap(serial));
+  }
+  function modalFrame(title,subtitle,body){return `<div class="dialog-head"><div><h2 id="dialog-title">${title}</h2>${subtitle?`<p>${subtitle}</p>`:''}</div><button type="button" class="icon-btn" data-action="close-modal" aria-label="닫기">${icon('close')}</button></div><div class="dialog-body"><div class="form-error" role="alert"></div>${body}</div>`;}
+  function options(values,selected){return values.map(([v,l])=>`<option value="${e(v)}" ${v===selected?'selected':''}>${e(l)}</option>`).join('');}
+  function candidateForm(c,slotId){
+    const editing=!!c,dId=c?.dayId||ui.day,d=state.days.find(d=>d.id===dId),available=d.slots.filter(s=>s.enabled),sId=c?.slotId||(available.some(s=>s.id===slotId)?slotId:available[0]?.id||'');
+    return modalFrame(editing?'아이디어 다듬기':'우리, 여기 어때요?','장소 하나가 여행의 시작이 될 수 있어요.',`<form data-form="candidate" id="candidate-form"><input type="hidden" name="id" value="${e(c?.id||'')}"><div class="form-grid"><div class="field"><label for="candidate-day">언제 갈까요?</label><select id="candidate-day" name="dayId" ${editing?'disabled':''}>${options(DAYS.map(d=>[d.id,shortDate(d.id)+' '+d.ko]),dId)}</select></div><div class="field"><label for="candidate-slot">어느 시간대에?</label><select id="candidate-slot" name="slotId" ${editing?'disabled':''} required>${options((editing?d.slots:available).map(s=>[s.id,slotMeta(s.id).label+' · '+s.start]),sId)}</select></div></div><div class="field" style="margin-top:18px"><label for="candidate-title">장소명 <span>*</span></label><input id="candidate-title" name="title" maxlength="100" value="${e(c?.title||'')}" placeholder="가고 싶은 장소나 음식점 이름" required></div><div class="form-grid"><div class="field"><label for="candidate-category">카테고리 <span>*</span></label><select id="candidate-category" name="category" required>${options(Object.entries(M.CATEGORIES),c?.category||(['breakfast','lunch','dinner'].includes(sId)?'meal':'sight'))}</select></div><div class="field"><label for="candidate-weather">날씨와의 궁합</label><select id="candidate-weather" name="weather">${options(Object.entries(WEATHER),c?.weather||'any')}</select></div></div><div class="map-input-box"><div class="field"><label for="candidate-maps">Google 지도 링크 <span>*</span></label><input id="candidate-maps" type="url" name="mapsUrl" maxlength="2000" value="${e(c?.mapsUrl||'')}" placeholder="Google 지도에서 복사한 공유 링크" required></div><div class="link-tools"><button type="button" class="text-btn" data-action="map-search">${icon('search',true)}Google 지도에서 검색 ${icon('external',true)}</button><button type="button" class="text-btn" data-action="generate-link">검색 링크 사용하기</button></div><p class="field-help">Google 지도 검색 → 장소 선택 → 공유 링크를 붙여넣어요.<br>자동 완성·주소·평점·사진 자동 수집은 아직 연결되지 않았어요.</p></div><div class="field"><label for="candidate-address">주소 / 동네 <span class="muted">선택</span></label><input id="candidate-address" name="address" maxlength="300" value="${e(c?.address||'')}" placeholder="정확한 주소나 동네를 남겨주세요"></div><div class="field"><label for="candidate-description">한마디 추천</label><textarea id="candidate-description" name="description" maxlength="2000" placeholder="어떤 점이 좋은지, 같이 무엇을 하면 좋을지 알려줘요.">${e(c?.description||'')}</textarea></div><div class="form-grid"><div class="field"><label for="candidate-cost">예상 비용 / 1인 · 엔</label><input id="candidate-cost" name="cost" type="number" inputmode="decimal" min="0" max="10000000" step="0.01" value="${e(c?.cost??'')}" placeholder="무료는 0, 모르면 빈칸"></div><div class="field"><label for="candidate-duration">예상 체류시간 · 분</label><input id="candidate-duration" name="duration" type="number" inputmode="numeric" min="0" max="1440" step="1" value="${e(c?.duration??'')}" placeholder="예: 90"></div></div><label class="check-label" style="margin-top:10px"><input name="reservation" type="checkbox" ${c?.reservation?'checked':''}>미리 예약해야 해요</label><details class="advanced"><summary>사진 · 지도 좌표 추가하기 <span class="muted">선택</span></summary><div class="field"><label for="candidate-photo">사진 URL</label><input id="candidate-photo" name="photoUrl" type="url" maxlength="2000" value="${e(c?.photoUrl||'')}" placeholder="직접 사용 가능한 이미지의 https:// 주소"><p class="field-help">사진 URL의 제공자에게 브라우저의 요청이 전송돼요. 사진을 사용할 권리가 있는지 확인해주세요.</p></div><div class="form-grid"><div class="field"><label for="candidate-lat">위도</label><input id="candidate-lat" name="lat" type="number" step="any" min="-90" max="90" value="${e(c?.lat??'')}" placeholder="예: 34.6937"></div><div class="field"><label for="candidate-lng">경도</label><input id="candidate-lng" name="lng" type="number" step="any" min="-180" max="180" value="${e(c?.lng??'')}" placeholder="예: 135.5023"></div></div><p class="field-help" style="margin-top:10px">전체 지도에 핀을 표시하려면 위도·경도가 필요해요. 지도 링크에 실제 장소 좌표가 있으면 자동으로 채워져요. 짧은 공유 링크나 지도 화면 중심 좌표는 자동 변환하지 않아요.</p></details><div class="dialog-actions">${btn('취소','close-modal','','secondary')}<button class="btn primary" type="submit">${icon(editing?'check':'plus',true)}${editing?'수정 저장':'후보 남기기'}</button></div></form>`);
+  }
+  function participantModal(){return modalFrame('지금 누구의 취향인가요?','5명의 참여자를 바꿔가며 투표를 체험할 수 있어요.',`<div class="info-box">이름 선택은 로그인이나 본인 인증이 아니에요. 실제 공동 사용을 위한 계정·권한은 아직 연결되지 않았어요.</div><div class="participant-list">${state.participants.map(p=>`<button type="button" class="participant-choice ${p.id===actor?'active':''}" data-action="select-person" data-person="${p.id}" aria-pressed="${p.id===actor}">${avatar(p.id)}<span class="name">${e(p.name)}</span>${p.id===actor?icon('check'):icon('chevron')}</button>`).join('')}</div><div class="dialog-actions">${btn('참여자 이름 바꾸기','settings','','secondary')}</div>`);}
+  function dayModal(){const d=day();return modalFrame('우리 일정에 맞게 조절해요',`11월 ${Number(meta(ui.day).num)}일 ${meta(ui.day).ko} · 시간은 현지 시각 기준`,`${d.locked?'<div class="info-box warning">잠금 상태예요. 변경하려면 아래에서 잠금을 해제해주세요.</div>':'<div class="info-box">첫날·마지막 날에는 필요한 시간대만 켜주세요. 시간대를 꺼도 후보와 투표는 삭제되지 않아요. 같은 시간대의 후보는 해당 시작·종료 시간을 함께 사용해요.</div>'}<form data-form="day"><fieldset ${d.locked?'disabled':''} style="border:0;padding:0;margin:0;min-width:0"><div class="field"><label for="day-status">오늘의 진행 상태</label><select id="day-status" name="status">${options(Object.entries(STATUS),d.status)}</select><p class="field-help">사용하는 모든 시간대에 일정이 선택되어야 ‘일정 확정’으로 표시할 수 있어요.</p></div>${d.slots.map(s=>`<div class="day-setting-row"><div class="day-setting-title"><label class="check-label"><input type="checkbox" name="enabled-${s.id}" ${s.enabled?'checked':''}>${slotMeta(s.id).icon} ${slotMeta(s.id).label}</label><span class="badge gray">${candidates(d.id,s.id).length}개 후보</span></div><div class="time-row"><label class="sr-only" for="start-${s.id}">${slotMeta(s.id).label} 시작 시간</label><input id="start-${s.id}" name="start-${s.id}" type="time" value="${s.start}" required><span class="muted">—</span><label class="sr-only" for="end-${s.id}">${slotMeta(s.id).label} 종료 시간</label><input id="end-${s.id}" name="end-${s.id}" type="time" value="${s.end}" required></div><label class="sr-only" for="transfer-${s.id}">${slotMeta(s.id).label} 이전 장소에서 이동 메모</label><input class="transfer-input" id="transfer-${s.id}" name="transfer-${s.id}" maxlength="120" value="${e(s.transfer)}" placeholder="이전 장소에서 이동 메모 (선택)"></div>`).join('')}</fieldset><div class="dialog-actions">${d.locked?btn(icon('unlock',true)+' 일정 잠금 해제','unlock','','primary'):`<button type="submit" name="mode" value="lock" class="btn secondary">${icon('lock',true)}저장 후 잠그기</button><button type="submit" name="mode" value="save" class="btn primary">${icon('check',true)}설정 저장</button>`}</div></form>`);}
+  function settingsModal(){return modalFrame('우리 보드의 설정','이름을 정하고, 소중한 아이디어를 보관해요.',`<form data-form="participants"><h3 class="subhead" style="margin-top:0">함께 가는 사람들</h3>${state.participants.map(p=>`<div class="participant-edit">${avatar(p.id)}<div class="field"><label class="sr-only" for="name-${p.id}">참여자 ${p.id.slice(1)} 이름</label><input id="name-${p.id}" name="${p.id}" maxlength="24" value="${e(p.name)}" required></div></div>`).join('')}<div class="dialog-actions" style="margin-top:12px"><button type="submit" class="btn primary small">참여자 이름 저장</button></div></form><section class="settings-section"><h3>${icon('download',true)} 백업 · 다른 기기로 옮기기</h3><p>현재 버전은 이 브라우저의 저장소를 사용해요. JSON 파일을 주고받아 보드를 옮길 수 있지만, <b>동시 편집·실시간 공유·자동 병합은 지원하지 않아요.</b> 가져오기는 현재 보드를 덮어쓰니 먼저 백업해주세요.</p><div class="settings-buttons">${btn(icon('download',true)+' JSON 백업','export','','secondary small')}<label class="btn secondary small import-label">${icon('upload',true)}JSON 가져오기<input id="import-file" type="file" accept="application/json,.json" class="sr-only"></label></div><p style="margin-top:10px">파일에는 참여자 이름, 댓글, 예약 메모가 포함돼요. 공유할 내용을 먼저 확인해주세요.</p></section><section class="settings-section"><h3>${icon('map',true)} 지도 기능 안내</h3><p>Google 지도 검색·장소 링크·구간별 길찾기가 연결되어 있어요. 전체 지도는 인터넷 연결 시 OpenStreetMap에 좌표가 있는 일정만 표시해요. 평점·사진 자동 수집, 자동 이동시간 계산은 아직 제공하지 않아요.</p></section><section class="settings-section"><h3>샘플 보드로 체험하기</h3><p>예시 후보와 투표가 들어 있는 별도 화면을 체험해요. 원래 보드는 그대로 보관돼요.</p><div class="settings-buttons">${btn(demo?'내 보드로 돌아가기':'샘플로 둘러보기',demo?'exit-demo':'demo','','soft small')}</div></section>${corruptRaw&&!demo?`<section class="settings-section"><h3>저장 데이터 복구</h3><p>자동 저장을 중지하고 원본을 보호하고 있어요. 원본을 다운로드한 후 초기화할 수 있어요.</p><div class="settings-buttons">${btn('오류 원본 다운로드','export-corrupt','','secondary small')}</div></section>`:''}<section class="settings-section"><h3>보드 초기화</h3><p>현재 ${demo?'샘플':'브라우저의'} 보드에 있는 후보·투표·댓글·예약 메모를 모두 지워요.</p><div class="settings-buttons">${btn(icon('trash',true)+' 초기화','reset','','danger small')}</div></section>`);}
+  function bookingsModal(){return modalFrame('여행의 기본 정보','이미 예약한 항공과 숙소 정보를 모아두세요.',`<div class="info-box">예약번호·여권번호 같은 민감한 정보는 넣지 않는 것을 권해요. 여기의 메모도 JSON 백업에 포함돼요.</div><form data-form="bookings"><div class="field"><label for="booking-flights">항공편</label><textarea id="booking-flights" name="flights" maxlength="3000" rows="5" placeholder="가는 편 / 오는 편, 항공편명과 현지 출발·도착 시간을 남겨요.">${e(state.bookings.flights)}</textarea></div><div class="field"><label for="booking-hotel">숙소</label><textarea id="booking-hotel" name="hotel" maxlength="3000" rows="5" placeholder="숙소 이름, 주소, 체크인·체크아웃 시간 등을 남겨요.">${e(state.bookings.hotel)}</textarea></div><div class="dialog-actions">${btn('취소','close-modal')}<button type="submit" class="btn primary">예약 정보 저장</button></div></form>`);}
+  function detailModal(c){
+    const d=state.days.find(d=>d.id===c.dayId),s=d.slots.find(s=>s.id===c.slotId),confirmed=s.confirmedId===c.id,rain=s.rainId===c.id;
+    return modalFrame('이 아이디어, 어때요?',`${shortDate(c.dayId)} ${slotMeta(c.slotId).label} · ${s.start}–${s.end}`,`<div class="detail-cover">${icon(c.category)}${c.photoUrl?`<img src="${e(c.photoUrl)}" alt="${e(c.title)} 사진" referrerpolicy="no-referrer">`:''}</div><div class="candidate-tags"><span class="badge">${e(M.CATEGORIES[c.category])}</span><span class="badge gray">${WEATHER[c.weather]}</span>${confirmed?'<span class="badge">✓ 확정 일정</span>':''}${rain?'<span class="badge gray">☂ 우천 대체</span>':''}${d.locked?'<span class="badge gray">잠김</span>':''}</div><h3 class="detail-title">${e(c.title)}</h3><p class="field-help">${e(name(c.authorId))}의 제안${c.address?' · '+e(c.address):''}</p><p class="detail-description">${e(c.description||'아직 추천 메모가 없어요. 댓글로 이야기를 나눠보세요.')}</p><div class="detail-facts"><div><span>1인 예상 비용</span>${money(c.cost)}</div><div><span>예상 체류시간</span>${duration(c.duration)}</div><div><span>예약 여부</span>${c.reservation?'미리 예약 필요':'별도 표시 없음'}</div><div><span>전체 지도 핀</span>${c.lat!==null?'좌표 입력됨':'좌표 미입력'}</div></div>${link(c.mapsUrl||M.searchUrl(c.title,c.address),icon('pin')+'Google 지도에서 자세히 보기 '+icon('external'),'btn secondary full')}<div class="detail-votes"><div class="vote-group"><button type="button" class="vote-btn ${c.votes.includes(actor)?'selected':''}" data-action="vote" data-id="${e(c.id)}" aria-pressed="${c.votes.includes(actor)}" ${d.locked?'disabled':''}>${icon('heart')} ${c.votes.length}명 투표${c.votes.includes(actor)?' · 취소':''}</button><button type="button" class="pick-btn ${c.picks.includes(actor)?'selected':''}" data-action="pick" data-id="${e(c.id)}" aria-pressed="${c.picks.includes(actor)}" ${d.locked?'disabled':''}>${icon('star')} ${c.picks.includes(actor)?'나의 PICK':'꼭 가고 싶음'}</button></div></div><p class="voter-names">${c.votes.length?'투표: '+c.votes.map(id=>e(name(id))).join(' · '):'아직 투표가 없어요.'}</p>${c.picks.length?`<p class="pick-names">★ ${c.picks.map(id=>e(name(id))).join(' · ')}의 PICK</p>`:''}<div class="confirm-options">${btn(icon(confirmed?'close':'check',true)+(confirmed?'확정 해제':'이 일정으로 확정'),'confirm',`data-id="${e(c.id)}" ${d.locked||!s.enabled?'disabled':''}`,confirmed?'soft':'primary')}${btn(icon('cloud',true)+(rain?'우천 대체 해제':'우천 대체로 지정'),'rain',`data-id="${e(c.id)}" ${d.locked||confirmed||!s.enabled?'disabled':''}`,'secondary')}</div><p class="field-help" style="margin-top:8px">투표 순위와 관계없이 선택할 수 있어요. 자동 확정되지는 않아요.</p>${c.authorId===actor?`<div class="settings-buttons">${btn(icon('edit',true)+' 후보 수정','edit',`data-id="${e(c.id)}" ${d.locked?'disabled':''}`,'ghost small')}${btn(icon('trash',true)+' 후보 삭제','delete',`data-id="${e(c.id)}" ${d.locked?'disabled':''}`,'danger small')}</div>`:''}<h4 class="subhead">${icon('message',true)} 이곳에 대한 이야기 <span class="muted">${c.comments.length}</span></h4><div class="comments">${c.comments.length?c.comments.map(m=>`<div class="comment"><strong>${e(name(m.authorId))}</strong><small>${new Intl.DateTimeFormat('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Seoul'}).format(new Date(m.createdAt))}</small><p>${e(m.text)}</p></div>`).join(''):'<p class="field-help">나누고 싶은 정보나 의견을 남겨주세요.</p>'}</div><form data-form="comment" class="comment-form"><input type="hidden" name="id" value="${e(c.id)}"><label class="sr-only" for="comment-text">댓글 내용</label><textarea id="comment-text" name="text" maxlength="500" rows="1" required placeholder="${e(name(actor))}님, 한마디 남겨주세요" ${d.locked?'disabled':''}></textarea><button type="submit" class="btn primary" ${d.locked?'disabled':''}>등록</button></form>`);
+  }
+  function openModal(kind,data={},preserve=false){
+    const dlg=$('#panel-dialog'),scroll=preserve?dlg.scrollTop:0;
+    modal={kind,...data,revision:savedRaw,dirty:false};
+    let content;
+    if(kind==='add')content=candidateForm(null,data.slotId);
+    else if(kind==='edit'){const c=byId(data.id);if(!c)return toast('후보를 찾을 수 없어요.');content=candidateForm(c);}
+    else if(kind==='detail'){const c=byId(data.id);if(!c){dlg.close();modal=null;return;}content=detailModal(c);}
+    else content=({participants:participantModal,day:dayModal,settings:settingsModal,bookings:bookingsModal}[kind]||settingsModal)();
+    $('#dialog-content').innerHTML=content;if(!dlg.open)dlg.showModal();dlg.scrollTop=scroll;
+  }
+  function closeModal(){const dlg=$('#panel-dialog');if(dlg.open)dlg.close();modal=null;}
+  function requestClose(){if(modal?.dirty){ask('작성 중인 내용을 닫을까요?','아직 저장하지 않은 내용은 사라져요.',()=>closeModal(),{label:'저장하지 않고 닫기'});}else closeModal();}
+  function ask(title,message,onConfirm,{label='확인',danger=false}={}){confirmHandler=onConfirm;$('#confirm-content').innerHTML=`<div class="dialog-head"><h2 id="confirm-title">${e(title)}</h2><button type="button" class="icon-btn" data-action="cancel-confirm" aria-label="취소">${icon('close')}</button></div><div class="dialog-body"><p style="font-size:13px;line-height:1.9;white-space:pre-line">${e(message)}</p><div class="dialog-actions">${btn('취소','cancel-confirm')}<button type="button" class="btn ${danger?'danger':'primary'}" data-action="accept-confirm">${e(label)}</button></div></div>`;const dlg=$('#confirm-dialog');if(!dlg.open)dlg.showModal();}
+  function refreshDetail(keepDraft=true){if(modal?.kind==='detail'){const draft=keepDraft?$('#comment-text')?.value||'':'';openModal('detail',{id:modal.id},true);if(draft&&$('#comment-text')){$('#comment-text').value=draft;modal.dirty=true;}}}
+  function withDiscard(fn){if(modal?.dirty)ask('저장하지 않은 내용이 있어요','이 화면을 나가면 작성 중인 내용은 사라져요.',fn,{label:'계속하기'});else fn();}
+  function setActor(id){if(!state.participants.some(p=>p.id===id))return;actor=id;try{sessionStorage.setItem(ACTOR_KEY,id);}catch{}closeModal();render();toast(name(id)+'님의 취향으로 참여해요.');}
+  function navigate(view){ui.view=view;render();window.scrollTo({top:0,behavior:'instant'});}
+  function downloadJSON(data,filename){const blob=new Blob([typeof data==='string'?data:JSON.stringify(data,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
+  function backup(){downloadJSON(state,`${demo?'DEMO-':''}osaka-trip-${new Date().toISOString().replace(/[:.]/g,'-')}.json`);toast('JSON 백업 다운로드를 요청했어요. 다운로드 목록을 확인해주세요.');}
+  function replacement(next,expected=savedRaw){
+    try{
+      const clean=M.validate(next);clean.updatedAt=new Date().toISOString();
+      if(!demo){
+        let latest;try{latest=localStorage.getItem(KEY);}catch{latest=expected;}
+        if(latest!==expected)throw new Error('다른 탭에서 보드가 변경됐어요. 최신 보드를 확인한 뒤 다시 가져와주세요.');
+        try{const raw=JSON.stringify(clean);localStorage.setItem(KEY,raw);savedRaw=raw;storageIssue='';corruptRaw='';}
+        catch{storageIssue='브라우저 저장에 실패했어요. 화면을 닫기 전에 JSON 백업을 다운로드해주세요.';corruptRaw='';}
+      }
+      state=clean;ui.expanded.clear();ui.more.clear();closeModal();render();return true;
+    }catch(err){showError(err.message);return false;}
+  }
+  async function importFile(file){
+    if(!file)return;
+    try{
+      if(file.size>3*1024*1024)throw new Error('백업 파일은 3MB 이하만 가져올 수 있어요.');
+      const next=M.validate(JSON.parse((await file.text()).replace(/^\uFEFF/,''))),expected=savedRaw;
+      ask('이 백업으로 보드를 바꿀까요?',`참여자 5명 · 후보 ${next.candidates.length}개가 담겨 있어요.\n현재 ${demo?'샘플':'브라우저의'} 보드를 덮어쓰며 자동 병합되지 않아요. 기존 보드를 먼저 백업했는지 확인해주세요.`,()=>{if(replacement(next,expected))toast('백업을 가져왔어요. 파일을 저장한 시점의 내용이에요.');},{label:'백업으로 교체',danger:true});
+    }catch(err){showError(err instanceof SyntaxError?'JSON 파일을 읽을 수 없어요. 이 보드에서 다운로드한 백업인지 확인해주세요.':err.message);}
+    finally{const input=$('#import-file');if(input)input.value='';}
+  }
+  function makeDemo(){
+    const n=M.create(),d=n.days[1];n.participants=[{id:'p1',name:'지석'},{id:'p2',name:'여행자 2'},{id:'p3',name:'여행자 3'},{id:'p4',name:'여행자 4'},{id:'p5',name:'여행자 5'}];
+    const demoCandidates=[
+      ['park','morning','공원 산책 · 예시','sight','천천히 걸으며 우리 여행의 첫 사진을 남겨요.',0,90,'outdoor',34.6873,135.5262,5,'p2'],
+      ['lookout','morning','전망대 구경 · 예시','sight','도시를 한눈에 내려다보는 시간은 어때요?',2000,60,'indoor',34.7055,135.4902,3,'p3'],
+      ['museum','morning','전시 구경 · 예시','activity','비가 와도 함께 즐길 수 있는 실내 후보예요.',1200,90,'indoor',34.6838,135.5204,2,'p4'],
+      ['walk','morning','동네 골목 탐방 · 예시','other','정해진 목적지 없이 가벼운 산책을 해봐요.',0,60,'outdoor',null,null,0,'p5'],
+      ['ramen','lunch','따뜻한 라멘 한 그릇 · 예시','meal','오전 일정을 마치고 든든하게 점심을 먹어요.',1500,60,'indoor',34.6695,135.5014,4,'p1'],
+      ['sushi','lunch','초밥 점심 · 예시','meal','점심 후보를 두고 같이 골라봐요.',2500,60,'indoor',34.6679,135.5021,3,'p2'],
+      ['coffee','afternoon1','느긋한 카페 시간 · 예시','cafe','잠깐 쉬면서 다음 동선을 이야기해요.',900,60,'indoor',34.6745,135.5009,3,'p3'],
+      ['shopping','afternoon2','쇼핑 산책 · 예시','shopping','각자 취향에 맞는 작은 기념품을 찾아봐요.',null,90,'any',34.6767,135.5012,2,'p4'],
+      ['dinner','dinner','함께하는 저녁 · 예시','meal','이야기 나누기 좋은 곳을 골라요. 예약 확인 필요!',3500,90,'indoor',34.6722,135.4987,5,'p5'],
+      ['night','evening1','강변 야경 · 예시','night','오늘의 마지막 사진은 반짝이는 밤 풍경으로.',0,60,'outdoor',34.6685,135.5017,4,'p1']
+    ];
+    n.candidates=demoCandidates.map((v,i)=>{const [id,slotId,title,category,description,cost,duration,weather,lat,lng,votes,authorId]=v;return {id:'demo-'+id,dayId:d.id,slotId,title,category,description:description+' (장소·비용은 기능 체험용 예시)',cost,duration,weather,lat,lng,authorId,mapsUrl:M.searchUrl(title.replace(' · 예시','')),address:'예시 위치 · 실제 장소 정보가 아니에요',photoUrl:'',reservation:id==='dinner',createdAt:new Date(Date.UTC(2026,8,5,10,i)).toISOString(),votes:n.participants.slice(0,votes).map(p=>p.id),picks:id==='park'?['p1','p4']:id==='night'?['p2','p3']:[],comments:id==='park'?[{id:'demo-comment',authorId:'p2',text:'이렇게 후보마다 의견을 남길 수 있어요. 이 댓글은 예시예요.',createdAt:'2026-09-05T11:00:00.000Z'}]:[]};});
+    d.status='vote';d.slots.find(s=>s.id==='morning').confirmedId='demo-park';d.slots.find(s=>s.id==='morning').rainId='demo-museum';d.slots.find(s=>s.id==='lunch').confirmedId='demo-ramen';
+    return M.validate(n);
+  }
+  function enterDemo(){
+    if(storageIssue&&!demo&&!corruptRaw){showError('현재 저장되지 않은 내용이 있어요. 먼저 JSON 백업을 다운로드한 뒤 샘플을 체험해주세요.');return;}
+    closeModal();demo=true;state=makeDemo();ui.day=DAYS[1].id;ui.view='board';ui.expanded=new Set(['morning','lunch']);render();window.scrollTo({top:0,behavior:'instant'});toast('샘플 체험을 시작했어요. 실제 보드는 그대로 보관돼요.');
+  }
+  function exitDemo(){closeModal();demo=false;readState();ui.expanded.clear();ui.more.clear();ui.view='board';render();toast('원래 보드로 돌아왔어요. 샘플의 변경 내용은 옮겨지지 않아요.');}
+  function updateCandidateSlots(){const form=$('#candidate-form');if(!form)return;const d=state.days.find(d=>d.id===form.elements.dayId.value),select=form.elements.slotId;select.innerHTML=options(d.slots.filter(s=>s.enabled).map(s=>[s.id,slotMeta(s.id).label+' · '+s.start]),'');if(d.locked)showError('이 날짜는 잠겨 있어요. 시간대 설정에서 먼저 잠금을 해제해주세요.');else if(!d.slots.some(s=>s.enabled))showError('이 날짜에 사용할 시간대를 먼저 켜주세요.');else{const error=$('#panel-dialog .form-error');if(error)error.textContent='';}}
+  function fillCoordinates(){const f=$('#candidate-form');if(!f)return;const coords=M.coordinates(f.elements.mapsUrl.value);if(coords){f.elements.lat.value=coords.lat;f.elements.lng.value=coords.lng;toast('지도 링크의 장소 좌표를 채웠어요.');}else if(modal?.kind==='edit'&&f.elements.mapsUrl.value!==byId(modal.id)?.mapsUrl){f.elements.lat.value='';f.elements.lng.value='';toast('지도 링크가 바뀌어 이전 좌표를 지웠어요. 필요하면 새 장소의 좌표를 입력해주세요.');}}
+  function revisionCheck(formKind){if(!demo&&modal&&modal.revision!==savedRaw&&['participants','day','bookings','candidate'].includes(formKind))throw new Error('이 화면을 연 뒤 다른 변경이 있었어요. 닫고 다시 열어 최신 내용을 확인해주세요.');}
+  document.addEventListener('submit',event=>{
+    const f=event.target;if(!(f instanceof HTMLFormElement)||!f.dataset.form)return;event.preventDefault();
+    try{
+      if(!f.reportValidity())return;
+      revisionCheck(f.dataset.form);
+      const fd=new FormData(f),value=k=>String(fd.get(k)??''),number=k=>value(k).trim()===''?null:Number(value(k));
+      if(f.dataset.form==='candidate'){
+        const id=value('id'),old=byId(id),dId=old?.dayId||value('dayId'),slotId=old?.slotId||value('slotId'),coords=M.coordinates(value('mapsUrl'));
+        const c={dayId:dId,slotId,title:value('title'),address:value('address'),mapsUrl:value('mapsUrl'),category:value('category'),weather:value('weather'),description:value('description'),photoUrl:value('photoUrl'),cost:number('cost'),duration:number('duration'),reservation:fd.has('reservation'),lat:number('lat'),lng:number('lng')};
+        if(c.lat===null&&c.lng===null&&coords){c.lat=coords.lat;c.lng=coords.lng;}
+        if(commit(id?{type:'edit',id,patch:c}:{type:'add',candidate:c},id?'후보를 수정했어요.':'새로운 아이디어를 남겼어요.')){ui.day=dId;ui.expanded.add(slotId);closeModal();render();}
+      }else if(f.dataset.form==='participants'){
+        if(commit({type:'participants',names:state.participants.map(p=>value(p.id))},'함께 가는 사람들의 이름을 저장했어요.'))openModal('settings');
+      }else if(f.dataset.form==='bookings'){
+        if(commit({type:'bookings',patch:{flights:value('flights'),hotel:value('hotel')}},'예약 정보를 저장했어요.'))closeModal();
+      }else if(f.dataset.form==='day'){
+        const d=day(),changes=d.slots.map(s=>({type:'slot',dayId:d.id,slotId:s.id,patch:{enabled:fd.has('enabled-'+s.id),start:value('start-'+s.id),end:value('end-'+s.id),transfer:value('transfer-'+s.id)}}));
+        changes.push({type:'day',dayId:d.id,patch:{status:value('status')}});
+        if(event.submitter?.value==='lock')changes.push({type:'day',dayId:d.id,patch:{locked:true}});
+        if(commit(changes,event.submitter?.value==='lock'?'시간대 설정을 저장하고 날짜를 잠갔어요.':'시간대 설정을 저장했어요.'))closeModal();
+      }else if(f.dataset.form==='comment'){
+        if(commit({type:'comment',id:value('id'),text:value('text')},'의견을 남겼어요.'))refreshDetail(false);
+      }
+    }catch(err){showError(err.message||'입력 내용을 확인해주세요.');}
+  });
+  document.addEventListener('click',event=>{
+    const el=event.target.closest('[data-action]');if(!el||el.disabled)return;
+    const a=el.dataset.action,id=el.dataset.id;
+    try{
+      if(a==='navigate')navigate(el.dataset.view);
+      else if(a==='date'){ui.day=el.dataset.day;ui.expanded.clear();ui.more.clear();render();}
+      else if(a==='slot-toggle'){const s=el.dataset.slot;ui.expanded.has(s)?ui.expanded.delete(s):ui.expanded.add(s);render();}
+      else if(a==='add'){if(day().locked)return toast('잠긴 날짜예요. 시간대 설정에서 잠금을 해제해주세요.');if(!day().slots.some(s=>s.enabled)){openModal('day');return toast('사용할 시간대를 먼저 켜주세요.');}openModal('add',{slotId:el.dataset.slot});}
+      else if(['settings','participants','day','bookings'].includes(a))withDiscard(()=>openModal(a));
+      else if(a==='detail')openModal('detail',{id});
+      else if(a==='edit')withDiscard(()=>openModal('edit',{id}));
+      else if(a==='close-modal')requestClose();
+      else if(a==='select-person')setActor(el.dataset.person);
+      else if(a==='vote'||a==='pick'){if(commit({type:a,id},a==='vote'?'투표를 반영했어요.':'나의 PICK을 반영했어요.'))refreshDetail();}
+      else if(a==='confirm'||a==='rain'){
+        const c=byId(id);if(!c)return;const d=state.days.find(d=>d.id===c.dayId),s=d.slots.find(s=>s.id===c.slotId),current=a==='confirm'?s.confirmedId:s.rainId,isClear=current===id;
+        const next=isClear?null:id,previous=byId(current);
+        ask(a==='confirm'?(isClear?'일정 확정을 해제할까요?':'이 일정으로 확정할까요?'):(isClear?'우천 대체를 해제할까요?':'비 오는 날의 대안으로 정할까요?'),isClear?'후보와 투표는 그대로 남아 있어요.':`${c.title}\n${previous?'기존 선택 ‘'+previous.title+'’ 대신 이 후보로 바뀌어요.':'투표 결과와 관계없이 이 후보가 선택돼요.'}`,()=>{if(commit({type:a,id:next,dayId:d.id,slotId:s.id},isClear?'선택을 해제했어요.':'우리의 선택을 저장했어요.'))refreshDetail();},{label:isClear?'해제하기':'선택하기'});
+      }else if(a==='delete'){
+        const c=byId(id);if(!c)return;ask('이 후보를 삭제할까요?',`‘${c.title}’의 투표와 댓글도 함께 삭제돼요. 확정·우천 대체로 선택된 경우 해당 선택도 해제돼요.`,()=>{if(commit({type:'delete',id},'후보를 삭제했어요.'))closeModal();},{label:'후보 삭제',danger:true});
+      }else if(a==='unlock')ask('날짜 잠금을 해제할까요?','후보 등록·투표·댓글·최종 일정 변경이 다시 가능해져요.',()=>{if(commit({type:'day',dayId:ui.day,patch:{locked:false}},'잠금을 해제했어요.'))openModal('day');},{label:'잠금 해제'});
+      else if(a==='category'){ui.category=el.dataset.category;render();}
+      else if(a==='clear-filters'){ui.query='';ui.category='all';ui.filterDay='all';ui.weather='all';render();}
+      else if(a==='map-mode'){ui.mapMode=el.dataset.mode;render();}
+      else if(a==='map-search'||a==='generate-link'){
+        const f=$('#candidate-form'),title=f?.elements.title.value.trim();if(!title)return showError('장소명을 먼저 입력해주세요.');
+        const url=M.searchUrl(title,f.elements.address.value.trim());
+        if(a==='map-search')window.open(url,'_blank','noopener,noreferrer');
+        else{f.elements.mapsUrl.value=url;modal.dirty=true;fillCoordinates();toast('장소명으로 검색하는 지도 링크를 넣었어요. 정확한 장소의 공유 링크로 바꿀 수도 있어요.');}
+      }else if(a==='export')backup();
+      else if(a==='export-corrupt'){downloadJSON(corruptRaw,'osaka-trip-recovery-original.json');toast('보관 중인 오류 원본의 다운로드를 요청했어요.');}
+      else if(a==='demo')withDiscard(enterDemo);
+      else if(a==='exit-demo')withDiscard(exitDemo);
+      else if(a==='reset'){
+        const expected=savedRaw;ask('보드를 처음 상태로 되돌릴까요?',`${demo?'샘플':'현재 브라우저의'} 후보·투표·댓글·예약 메모가 모두 삭제돼요. 되돌릴 수 없으니 필요한 내용은 JSON으로 백업해주세요.`,()=>{if(replacement(M.create(),expected))toast('빈 보드로 초기화했어요.');},{label:'모두 초기화',danger:true});
+      }else if(a==='cancel-confirm'){$('#confirm-dialog').close();confirmHandler=null;}
+      else if(a==='accept-confirm'){const fn=confirmHandler;confirmHandler=null;$('#confirm-dialog').close();fn?.();}
+    }catch(err){showError(err.message||'이 작업을 완료하지 못했어요.');}
+  });
+  document.addEventListener('input',event=>{
+    if(event.target.id==='candidate-search'){ui.query=event.target.value;$('#candidate-results').innerHTML=candidateResults();}
+    if(event.target.closest('#panel-dialog form')&&modal)modal.dirty=true;
+  });
+  document.addEventListener('change',event=>{
+    const t=event.target;
+    if(t.id==='filter-day'){ui.filterDay=t.value;$('#candidate-results').innerHTML=candidateResults();}
+    else if(t.id==='filter-weather'){ui.weather=t.value;$('#candidate-results').innerHTML=candidateResults();}
+    else if(t.id==='travel-mode'){ui.travelmode=t.value;render();}
+    else if(t.id==='candidate-day')updateCandidateSlots();
+    else if(t.id==='candidate-maps')fillCoordinates();
+    else if(t.id==='import-file')importFile(t.files[0]);
+    if(t.closest('#panel-dialog form')&&modal)modal.dirty=true;
+  });
+  document.addEventListener('toggle',event=>{const target=event.target;if(target.matches?.('details[data-more]'))target.open?ui.more.add(target.dataset.more):ui.more.delete(target.dataset.more);},true);
+  document.addEventListener('error',event=>{if(event.target instanceof HTMLImageElement){event.target.removeAttribute('src');event.target.hidden=true;}},true);
+  $('#panel-dialog').addEventListener('cancel',event=>{event.preventDefault();requestClose();});
+  $('#panel-dialog').addEventListener('click',event=>{if(event.target===$('#panel-dialog')){const r=event.target.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)requestClose();}});
+  $('#confirm-dialog').addEventListener('cancel',()=>{confirmHandler=null;});
+  window.addEventListener('storage',event=>{
+    if(event.key!==KEY||demo)return;
+    if(storageIssue){toast('다른 탭에서 변경이 있었어요. 이 화면의 저장되지 않은 내용을 먼저 백업해주세요.');return;}
+    try{state=event.newValue?M.validate(JSON.parse(event.newValue)):M.create();savedRaw=event.newValue;render();if(modal?.kind==='detail')refreshDetail();toast('같은 브라우저의 다른 탭에서 수정한 내용을 반영했어요.');}
+    catch{storageIssue='다른 탭의 저장 데이터에 오류가 있어요. 현재 화면을 JSON으로 백업한 후 확인해주세요.';render();}
+  });
+  window.addEventListener('beforeunload',event=>{if(modal?.dirty||storageIssue&&!corruptRaw){event.preventDefault();event.returnValue='';}});
+  async function loadLeaflet(){
+    if(globalThis.L)return globalThis.L;
+    if(leafletPromise)return leafletPromise;
+    leafletPromise=new Promise((resolve,reject)=>{
+      if(!$('#leaflet-css')){const css=document.createElement('link');css.id='leaflet-css';css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';css.integrity='sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';css.crossOrigin='anonymous';document.head.append(css);}
+      const script=document.createElement('script');script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';script.integrity='sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';script.crossOrigin='anonymous';
+      const timer=setTimeout(()=>{script.remove();reject(new Error('지도 로딩 시간이 초과되었어요.'));},12000);
+      script.onload=()=>{clearTimeout(timer);globalThis.L?resolve(globalThis.L):reject(new Error('지도 모듈을 불러오지 못했어요.'));};
+      script.onerror=()=>{clearTimeout(timer);script.remove();reject(new Error('인터넷 연결 또는 지도 제공 서버를 확인해주세요.'));};document.head.append(script);
+    }).catch(err=>{leafletPromise=null;throw err;});return leafletPromise;
+  }
+  async function initMap(serial){
+    const route=M.route(state,ui.day,ui.mapMode),pins=route.filter(r=>r.candidate.lat!==null);if(!pins.length)return;
+    try{
+      const L=await loadLeaflet();if(serial!==renderSerial||ui.view!=='map'||!$('#trip-map'))return;
+      const host=$('#trip-map');host.innerHTML='';mapInstance=L.map(host,{scrollWheelZoom:false}).setView([pins[0].candidate.lat,pins[0].candidate.lng],13);
+      const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'}).addTo(mapInstance);
+      let tileErrors=0;tiles.on('tileerror',()=>{if(++tileErrors===3)toast('배경 지도 일부를 불러오지 못했어요. 인터넷 연결을 확인해주세요.');});
+      const points=[];
+      for(const r of pins){const c=r.candidate,point=[c.lat,c.lng];points.push(point);const popup=document.createElement('div'),title=document.createElement('strong');title.textContent=r.index+'. '+c.title;popup.append(title,document.createElement('br'));const a=document.createElement('a');a.href=c.mapsUrl||M.searchUrl(c.title,c.address);a.textContent='Google 지도에서 보기';a.target='_blank';a.rel='noopener noreferrer';popup.append(a);L.marker(point,{icon:L.divIcon({html:`<span class="map-pin">${r.index}</span>`,className:'',iconSize:[28,28],iconAnchor:[14,14]}),title:c.title}).addTo(mapInstance).bindPopup(popup);}
+      // Never join across missing coordinates: a skipped venue would hide a detour.
+      for(let i=1;i<route.length;i++){const a=route[i-1].candidate,b=route[i].candidate;if(a.lat!==null&&b.lat!==null)L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#0064ff',weight:3,dashArray:'5 8',opacity:.7}).addTo(mapInstance);}
+      if(points.length>1)mapInstance.fitBounds(L.latLngBounds(points),{padding:[35,35],maxZoom:15});mapInstance.invalidateSize();
+    }catch(err){if(serial!==renderSerial||!$('#trip-map'))return;$('#trip-map').innerHTML=`<div class="map-placeholder">${icon('map')}<p>배경 지도를 불러오지 못했어요.<br>${e(err.message)}<br>아래 일정 목록과 Google 지도 링크는 그대로 사용할 수 있어요.</p></div>`;}
+  }
+  render();
+})();
