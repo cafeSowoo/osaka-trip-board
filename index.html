@@ -638,6 +638,21 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
   .day-setting-title { flex-wrap: wrap; }
   .dialog-body { padding-right: 18px; padding-left: 18px; }
 }
+.join-page { min-height: 100dvh; display: grid; place-items: center; padding: 28px 18px; background: var(--paper); }
+.join-card { width: min(100%, 440px); background: #fff; border-radius: 28px; padding: 28px 24px; box-shadow: 0 12px 40px rgba(25,31,40,.08); }
+.join-card .brand { margin-bottom: 36px; }
+.join-art { width: 74px; height: 74px; display: grid; place-items: center; margin-bottom: 22px; border-radius: 24px; background: var(--blue-soft); color: var(--blue); transform: rotate(-4deg); }
+.join-art .icon { width: 34px; height: 34px; }
+.join-card h1 { margin: 8px 0 10px; font-size: 30px; letter-spacing: -.04em; color: var(--ink); }
+.join-card > p { margin: 0 0 24px; line-height: 1.7; color: var(--muted); }
+.join-form { display: grid; gap: 10px; margin-top: 18px; }
+.join-form label { font-size: 13px; font-weight: 700; color: var(--ink); }
+.join-form input { width: 100%; min-height: 52px; padding: 0 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); font: inherit; }
+.join-form input:focus { outline: 3px solid var(--blue-soft); border-color: var(--blue); }
+.join-form .btn { margin-top: 4px; }
+.join-card > small { display: block; margin-top: 16px; line-height: 1.6; color: var(--muted); }
+.local-notice.shared { background: var(--blue-soft); color: var(--blue-text); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
@@ -779,10 +794,161 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
   globalThis.TripModel=Object.freeze({SLOTS,CATEGORIES,create,validate,change,rank,budget,route,searchUrl,directionsUrl,coordinates,safeUrl});
 })();
 </script>
-  <script>/* Standalone UI. No backend, login, analytics or hidden network writes. */
+  <script>/* Shared Supabase adapter for the published GitHub Pages board. */
+(() => {
+  'use strict';
+
+  const URL='https://myincubzgvhyreyqbban.supabase.co';
+  const KEY='sb_publishable_6NmnzRERi_Azsyh44zbZnw_HjqHh7hd';
+  const TRIP_ID='osaka-2026';
+  const TOKEN_KEY='trip-together.osaka.2026.invite-token';
+  const LOCAL_HOSTS=new Set(['127.0.0.1','localhost']);
+
+  const isRemote=()=>location.protocol!=='file:'&&!LOCAL_HOSTS.has(location.hostname);
+
+  function tokenFromHash(){
+    const raw=location.hash.startsWith('#')?location.hash.slice(1):location.hash;
+    if(!raw)return '';
+    const params=new URLSearchParams(raw);
+    const token=(params.get('join')||'').trim();
+    if(!token)return '';
+    history.replaceState(null,'',location.pathname+location.search);
+    return token;
+  }
+
+  function getToken(){
+    const fromHash=tokenFromHash();
+    if(fromHash){try{localStorage.setItem(TOKEN_KEY,fromHash);}catch{}return fromHash;}
+    try{return localStorage.getItem(TOKEN_KEY)||'';}catch{return '';}
+  }
+
+  function setToken(token){
+    token=String(token||'').trim();
+    if(!/^[A-Za-z0-9_-]{20,100}$/.test(token))throw new Error('초대 코드 형식을 확인해주세요.');
+    try{localStorage.setItem(TOKEN_KEY,token);}catch{throw new Error('이 브라우저에 초대 코드를 저장할 수 없어요.');}
+    return token;
+  }
+
+  function clearToken(){try{localStorage.removeItem(TOKEN_KEY);}catch{}}
+
+  async function request(path,{method='GET',body,prefer,token=getToken()}={}){
+    if(!token)throw new Error('초대 코드가 필요해요.');
+    const headers={apikey:KEY,Authorization:`Bearer ${KEY}`,'x-osaka-trip-token':token};
+    if(body!==undefined)headers['Content-Type']='application/json';
+    if(prefer)headers.Prefer=prefer;
+    let response;
+    try{response=await fetch(URL+'/rest/v1/'+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});}
+    catch{throw new Error('공용 보드에 연결할 수 없어요. 인터넷 연결을 확인해주세요.');}
+    const text=await response.text();
+    let data=null;
+    if(text){try{data=JSON.parse(text);}catch{data=text;}}
+    if(!response.ok){
+      const message=data?.message||data?.hint||`서버 요청에 실패했어요. (${response.status})`;
+      throw new Error(message);
+    }
+    return data;
+  }
+
+  async function whoami(token=getToken()){
+    const data=await request('rpc/osaka_trip_whoami',{method:'POST',body:{p_trip_id:TRIP_ID},token});
+    if(typeof data!=='string'||!/^p[1-5]$/.test(data))throw new Error('유효하지 않은 초대 코드예요.');
+    return data;
+  }
+
+  async function rows(table,query=''){
+    return request(`${table}?trip_id=eq.${encodeURIComponent(TRIP_ID)}${query?'&'+query:''}`);
+  }
+
+  const time=v=>String(v||'').slice(0,5);
+
+  async function load(){
+    const [trips,members,days,slots,candidates,votes,picks,comments]=await Promise.all([
+      request(`osaka_trip_trips?id=eq.${TRIP_ID}&select=*`),
+      rows('osaka_trip_members','select=*&order=sort_order.asc'),
+      rows('osaka_trip_days','select=*&order=day_date.asc'),
+      rows('osaka_trip_slots','select=*&order=day_date.asc,sort_order.asc'),
+      rows('osaka_trip_candidates','select=*&order=created_at.asc'),
+      rows('osaka_trip_votes','select=*&order=created_at.asc'),
+      rows('osaka_trip_picks','select=*&order=created_at.asc'),
+      rows('osaka_trip_comments','select=*&order=created_at.asc')
+    ]);
+    const trip=trips?.[0];
+    if(!trip||members.length!==5||days.length!==3||slots.length!==24)throw new Error('공용 여행 보드의 기본 데이터가 올바르지 않아요.');
+    const voteMap=new Map(),pickMap=new Map(),commentMap=new Map();
+    for(const v of votes){if(!voteMap.has(v.candidate_id))voteMap.set(v.candidate_id,[]);voteMap.get(v.candidate_id).push(v.member_id);}
+    for(const p of picks){if(!pickMap.has(p.candidate_id))pickMap.set(p.candidate_id,[]);pickMap.get(p.candidate_id).push(p.member_id);}
+    for(const c of comments){if(!commentMap.has(c.candidate_id))commentMap.set(c.candidate_id,[]);commentMap.get(c.candidate_id).push({id:c.id,authorId:c.member_id,text:c.body,createdAt:c.created_at});}
+    const state={
+      version:1,
+      updatedAt:trip.updated_at,
+      participants:members.map(m=>({id:m.member_id,name:m.display_name})),
+      days:days.map(d=>({
+        id:d.day_date,status:d.status,locked:d.locked,
+        slots:slots.filter(s=>s.day_date===d.day_date).map(s=>({id:s.slot_id,enabled:s.enabled,start:time(s.start_time),end:time(s.end_time),confirmedId:s.confirmed_candidate_id,rainId:s.rain_candidate_id,transfer:s.transfer||''}))
+      })),
+      candidates:candidates.map(c=>({
+        id:c.id,dayId:c.day_date,slotId:c.slot_id,title:c.title,address:c.address||'',mapsUrl:c.maps_url,category:c.category,
+        cost:c.cost===null?null:Number(c.cost),duration:c.duration_minutes===null?null:Number(c.duration_minutes),reservation:c.reservation,
+        weather:c.weather,description:c.description||'',photoUrl:c.photo_url||'',lat:c.lat===null?null:Number(c.lat),lng:c.lng===null?null:Number(c.lng),
+        authorId:c.author_member_id,createdAt:c.created_at,votes:voteMap.get(c.id)||[],picks:pickMap.get(c.id)||[],comments:commentMap.get(c.id)||[]
+      })),
+      bookings:{flights:trip.flights||'',hotel:trip.hotel||''}
+    };
+    return globalThis.TripModel.validate(state);
+  }
+
+  function candidateBody(c,actor){return {trip_id:TRIP_ID,day_date:c.dayId,slot_id:c.slotId,title:c.title,address:c.address,maps_url:c.mapsUrl,category:c.category,cost:c.cost,duration_minutes:c.duration,reservation:c.reservation,weather:c.weather,description:c.description,photo_url:c.photoUrl,lat:c.lat,lng:c.lng,author_member_id:actor};}
+  function candidatePatch(c){return {title:c.title,address:c.address,maps_url:c.mapsUrl,category:c.category,cost:c.cost,duration_minutes:c.duration,reservation:c.reservation,weather:c.weather,description:c.description,photo_url:c.photoUrl,lat:c.lat,lng:c.lng};}
+
+  async function persist(action,{actor,state,next}){
+    const one=async a=>{
+      if(a.type==='add')return request('osaka_trip_candidates',{method:'POST',body:candidateBody(a.candidate,actor),prefer:'return=minimal'});
+      if(a.type==='edit')return request(`osaka_trip_candidates?id=eq.${encodeURIComponent(a.id)}`,{method:'PATCH',body:candidatePatch(a.patch),prefer:'return=minimal'});
+      if(a.type==='delete')return request(`osaka_trip_candidates?id=eq.${encodeURIComponent(a.id)}`,{method:'DELETE',prefer:'return=minimal'});
+      if(a.type==='vote'||a.type==='pick'){
+        const c=state.candidates.find(c=>c.id===a.id);if(!c)throw new Error('후보를 찾을 수 없어요.');
+        const selected=(a.type==='vote'?c.votes:c.picks).includes(actor),table=a.type==='vote'?'osaka_trip_votes':'osaka_trip_picks';
+        if(selected)return request(`${table}?candidate_id=eq.${encodeURIComponent(a.id)}&member_id=eq.${actor}`,{method:'DELETE',prefer:'return=minimal'});
+        return request(table,{method:'POST',body:{trip_id:TRIP_ID,candidate_id:a.id,member_id:actor},prefer:'return=minimal'});
+      }
+      if(a.type==='comment')return request('osaka_trip_comments',{method:'POST',body:{trip_id:TRIP_ID,candidate_id:a.id,member_id:actor,body:a.text},prefer:'return=minimal'});
+      if(a.type==='confirm'||a.type==='rain'){
+        const column=a.type==='confirm'?'confirmed_candidate_id':'rain_candidate_id';
+        return request(`osaka_trip_slots?day_date=eq.${a.dayId}&slot_id=eq.${a.slotId}`,{method:'PATCH',body:{[column]:a.id},prefer:'return=minimal'});
+      }
+      if(a.type==='slot'){
+        const patch={};
+        if(Object.hasOwn(a.patch,'enabled'))patch.enabled=a.patch.enabled;
+        if(Object.hasOwn(a.patch,'start'))patch.start_time=a.patch.start;
+        if(Object.hasOwn(a.patch,'end'))patch.end_time=a.patch.end;
+        if(Object.hasOwn(a.patch,'transfer'))patch.transfer=a.patch.transfer;
+        return request(`osaka_trip_slots?day_date=eq.${a.dayId}&slot_id=eq.${a.slotId}`,{method:'PATCH',body:patch,prefer:'return=minimal'});
+      }
+      if(a.type==='day')return request(`osaka_trip_days?day_date=eq.${a.dayId}`,{method:'PATCH',body:a.patch,prefer:'return=minimal'});
+      if(a.type==='bookings')return request(`osaka_trip_trips?id=eq.${TRIP_ID}`,{method:'PATCH',body:a.patch,prefer:'return=minimal'});
+      if(a.type==='participants'){
+        const targets=actor==='p1'?next.participants:next.participants.filter(p=>p.id===actor);
+        for(const p of targets)await request(`osaka_trip_members?member_id=eq.${p.id}`,{method:'PATCH',body:{display_name:p.name},prefer:'return=minimal'});
+        return;
+      }
+      throw new Error('공용 보드에서 지원하지 않는 작업이에요.');
+    };
+    for(const a of (Array.isArray(action)?action:[action]))await one(a);
+  }
+
+  async function revision(){
+    const rows=await request(`osaka_trip_trips?id=eq.${TRIP_ID}&select=updated_at`);
+    return rows?.[0]?.updated_at||'';
+  }
+
+  globalThis.TripRemote=Object.freeze({isRemote,TRIP_ID,TOKEN_KEY,getToken,setToken,clearToken,whoami,load,persist,revision});
+})();
+</script>
+  <script>/* Trip Together UI. Published builds use the shared Supabase adapter; localhost/file keeps the offline prototype mode. */
 (() => {
   'use strict';
   const M=globalThis.TripModel;
+  const R=globalThis.TripRemote;
   const KEY='trip-together.osaka.2026.v1',ACTOR_KEY=KEY+'.actor';
   const $=s=>document.querySelector(s);
   const e=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -795,10 +961,13 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
   const DAYS=[{id:'2026-11-06',num:'06',day:'FRI',ko:'금요일'},{id:'2026-11-07',num:'07',day:'SAT',ko:'토요일'},{id:'2026-11-08',num:'08',day:'SUN',ko:'일요일'}];
   const STATUS={collect:'후보 모집 중',vote:'투표 중',final:'일정 확정'};
   const WEATHER={any:'날씨 무관',indoor:'실내',outdoor:'야외'};
+  const remoteMode=!!R?.isRemote?.();
   let state,savedRaw=null,storageIssue='',corruptRaw='',actor='p1',demo=false;
+  let remoteReady=!remoteMode,remoteSaving=false,remoteError='',pollTimer=null;
   let modal=null,confirmHandler=null,toastTimer,mapInstance=null,leafletPromise=null,renderSerial=0;
   const ui={view:'board',day:DAYS[0].id,expanded:new Set(),more:new Set(),query:'',category:'all',filterDay:'all',weather:'all',mapMode:'confirmed',travelmode:'transit'};
   function readState(){
+    if(remoteMode){state=M.create();savedRaw='';storageIssue='';corruptRaw='';return;}
     try{
       savedRaw=localStorage.getItem(KEY);
       if(savedRaw){try{state=M.validate(JSON.parse(savedRaw));}catch(err){corruptRaw=savedRaw;storageIssue='저장된 데이터에 오류가 있어 자동 저장을 중지했어요. 설정에서 원본을 백업한 뒤 초기화해주세요.';state=M.create();return;}}
@@ -823,7 +992,15 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
   function commit(actions,message='저장했어요.'){
     try{
       if(!demo&&corruptRaw)throw new Error('오류가 있는 원본을 보호하고 있어요. 설정에서 원본 백업 후 초기화해주세요.');
+      if(remoteMode&&!demo&&!remoteReady)throw new Error('공용 보드 연결을 먼저 완료해주세요.');
+      if(remoteMode&&!demo&&remoteSaving)throw new Error('이전 변경을 저장하고 있어요. 잠시 후 다시 시도해주세요.');
       if(!demo){
+        if(remoteMode){
+          let next=state;for(const a of (Array.isArray(actions)?actions:[actions]))next=M.change(next,a,actor);
+          const previous=state;state=next;remoteSaving=true;render();if(message)toast(message+' · 동기화 중');
+          R.persist(actions,{actor,state:previous,next}).then(()=>loadRemote({quiet:true})).then(()=>{remoteSaving=false;render();if(message)toast(message);}).catch(async err=>{remoteSaving=false;remoteError=err.message||'공용 보드 저장에 실패했어요.';try{await loadRemote({quiet:true});}catch{}render();showError(remoteError);});
+          return true;
+        }
         let latest;try{latest=localStorage.getItem(KEY);}catch{latest=savedRaw;}
         if(latest!==savedRaw){
           state=latest?M.validate(JSON.parse(latest)):M.create();savedRaw=latest;render();
@@ -843,7 +1020,12 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
   function brand(){return `<div class="brand"><span class="brand-symbol">${icon('plane')}</span><div class="brand-name">trip together</div></div>`;}
   function navButton(view,label,glyph){return `<button type="button" data-action="navigate" data-view="${view}" class="${ui.view===view?'active':''}" ${ui.view===view?'aria-current="page"':''}>${icon(glyph)}<span>${label}</span>${view==='candidates'?`<span class="nav-count">${state.candidates.length||''}</span>`:''}</button>`;}
   function sidebar(){return `<aside class="sidebar">${brand()}<div class="sidebar-trip"><div class="eyebrow">함께 만드는 여행</div><h2>우리들의 오사카</h2><p>2026.11.06 — 11.08 · 5명</p></div><nav class="side-nav" aria-label="주 메뉴">${navButton('board','일정 보드','board')}${navButton('candidates','후보 모아보기','list')}${navButton('map','지도 · 동선','map')}${navButton('mine','내 투표','heart')}</nav><div class="sidebar-bottom"><div class="side-note">${icon('heart')}<strong>마음에 드는 곳은 여러 곳에</strong>투표는 자유롭게, 꼭 가고 싶은<br>3곳에는 PICK을 남겨 주세요.</div><div class="side-footer">다섯 명이 함께 만드는 오사카 여행</div></div></aside>`;}
-  function topbar(){return `<header class="topbar"><div class="breadcrumb">우리의 여행 ${icon('chevron',true)} <b>오사카 2026</b></div><div class="mobile-brand">${brand()}</div><div class="top-actions">${btn(icon('plus',true)+' 후보 추가','add','','primary')}<button type="button" class="profile-btn" data-action="participants" aria-label="현재 참여자 ${e(name(actor))}, 참여자 바꾸기">${avatar(actor)}<span class="profile-name">${e(name(actor))}</span>${icon('down',true)}</button><button type="button" class="icon-btn" data-action="settings" aria-label="보드 설정 및 백업">${icon('gear')}</button></div></header><div class="local-notice"><span>${icon('shield',true)}이 브라우저에 저장 · 다른 기기와 실시간 공유되지 않아요</span><button type="button" class="text-btn" data-action="settings">백업 · 공유 ${icon('chevron',true)}</button></div>${demo?`<div class="demo-notice"><span><b>샘플 체험 중</b> · 장소·위치·비용·투표는 기능 설명용 예시예요. 내 보드와 분리되어 있어요.</span><button type="button" class="text-btn" data-action="exit-demo">내 보드로 돌아가기</button></div>`:''}${storageIssue&&!demo?`<div class="storage-notice" role="alert">${e(storageIssue)}<button type="button" class="text-btn" data-action="settings">설정</button></div>`:''}`;}
+  function topbar(){
+    const notice=remoteMode&&!demo
+      ?`<div class="local-notice shared"><span>${icon('shield',true)}${remoteSaving?'공용 보드에 저장 중…':'공용 보드 연결됨 · 다른 기기의 변경도 자동으로 확인해요'}</span><button type="button" class="text-btn" data-action="settings">백업 · 연결 ${icon('chevron',true)}</button></div>`
+      :`<div class="local-notice"><span>${icon('shield',true)}이 브라우저에 저장 · 다른 기기와 실시간 공유되지 않아요</span><button type="button" class="text-btn" data-action="settings">백업 · 공유 ${icon('chevron',true)}</button></div>`;
+    return `<header class="topbar"><div class="breadcrumb">우리의 여행 ${icon('chevron',true)} <b>오사카 2026</b></div><div class="mobile-brand">${brand()}</div><div class="top-actions">${btn(icon('plus',true)+' 후보 추가','add','','primary')}<button type="button" class="profile-btn" data-action="participants" aria-label="현재 참여자 ${e(name(actor))}, 참여자 정보 보기">${avatar(actor)}<span class="profile-name">${e(name(actor))}</span>${icon('down',true)}</button><button type="button" class="icon-btn" data-action="settings" aria-label="보드 설정 및 백업">${icon('gear')}</button></div></header>${notice}${demo?`<div class="demo-notice"><span><b>샘플 체험 중</b> · 장소·위치·비용·투표는 기능 설명용 예시예요. 내 보드와 분리되어 있어요.</span><button type="button" class="text-btn" data-action="exit-demo">내 보드로 돌아가기</button></div>`:''}${remoteError&&!demo?`<div class="storage-notice" role="alert">${e(remoteError)}<button type="button" class="text-btn" data-action="retry-sync">다시 연결</button></div>`:''}${storageIssue&&!demo?`<div class="storage-notice" role="alert">${e(storageIssue)}<button type="button" class="text-btn" data-action="settings">설정</button></div>`:''}`;
+  }
   function hero(){
     const confirmed=state.days.reduce((total,d)=>total+d.slots.filter(s=>s.enabled&&s.confirmedId).length,0);
     return `<section class="hero" aria-label="오사카 여행 소개">
@@ -880,8 +1062,10 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
   function mine(){const votes=state.candidates.filter(c=>c.votes.includes(actor)),picks=state.candidates.filter(c=>c.picks.includes(actor)),own=state.candidates.filter(c=>c.authorId===actor);return `<div class="page-title"><div class="eyebrow muted">A TRIP THAT FEELS LIKE YOU</div><h1>내 마음이 향하는 곳</h1><p>투표와 PICK, 내가 제안한 아이디어를 한눈에.</p></div><div class="my-banner">${avatar(actor)}<div><h3>${e(name(actor))}님의 여행 취향</h3><p>여러 후보에 투표할 수 있어요. 같은 후보에는 한 표씩!</p></div><div class="pick-budget"><b>${picks.length}<span style="font-size:14px;opacity:.5"> / 3</span></b>나의 PICK</div></div><h2 class="list-heading">${icon('star')}꼭 가고 싶은 곳 <small>${picks.length}곳</small></h2>${picks.length?`<div class="candidates-grid">${picks.map(candidateTile).join('')}</div>`:'<div class="inline-empty">후보 카드의 ☆ PICK을 눌러보세요. 여행 전체에서 3곳까지!</div>'}<h2 class="list-heading">${icon('heart')}내가 투표한 곳 <small>${votes.length}곳</small></h2>${votes.length?`<div class="candidates-grid">${votes.map(candidateTile).join('')}</div>`:`<div class="empty-state"><div class="empty-art">${icon('heart')}</div><h3>마음에 드는 곳을 찾아볼까요?</h3><p>후보를 살펴보고, 함께 가고 싶은 곳에 투표해요.</p>${btn('후보 모아보기','navigate','data-view="candidates"')}</div>`}<h2 class="list-heading">${icon('plane')}내가 제안한 곳 <small>${own.length}곳</small></h2>${own.length?`<div class="candidates-grid">${own.map(candidateTile).join('')}</div>`:'<div class="inline-empty">나만 알고 있던 그곳, 첫 아이디어를 나눠주세요.</div>'}`;}
   function mapPage(){const route=M.route(state,ui.day,ui.mapMode),coords=route.filter(r=>r.candidate.lat!==null),missing=route.length-coords.length;return `<div class="page-title"><div class="eyebrow muted">CONNECT THE LITTLE MOMENTS</div><h1>한눈에 보는 우리의 동선</h1><p>가고 싶은 곳들 사이, 함께 걸어갈 길을 살펴봐요.</p></div>${dateBar()}<div class="map-controls"><div class="segmented" role="group" aria-label="지도에 표시할 후보"><button type="button" data-action="map-mode" data-mode="confirmed" class="${ui.mapMode==='confirmed'?'active':''}" aria-pressed="${ui.mapMode==='confirmed'}">확정 일정</button><button type="button" data-action="map-mode" data-mode="leaders" class="${ui.mapMode==='leaders'?'active':''}" aria-pressed="${ui.mapMode==='leaders'}">확정 + 상위 후보</button></div><select class="filter-select" id="travel-mode" aria-label="길찾기 교통수단"><option value="transit" ${ui.travelmode==='transit'?'selected':''}>대중교통</option><option value="walking" ${ui.travelmode==='walking'?'selected':''}>도보</option><option value="driving" ${ui.travelmode==='driving'?'selected':''}>자동차</option></select></div><div class="map-panel" id="trip-map"><div class="map-placeholder">${icon('map')}<p>${coords.length?'지도를 불러오고 있어요.':route.length?'장소 좌표를 추가하면 여기에 핀이 표시돼요.<br>아래 목록의 Google 지도 연결은 바로 사용할 수 있어요.':'아직 표시할 일정이 없어요.<br>후보를 확정하거나 상위 후보 보기를 선택해보세요.'}</p></div></div><p class="map-caption">지도는 OpenStreetMap을 사용해요. 연결선은 방문 순서이며 실제 도로·이동 경로가 아니에요. 이동시간은 아래 Google 길찾기에서 확인해주세요.${missing?`<br>좌표 미입력 ${missing}곳은 핀에서 제외되지만 일정 목록에는 표시돼요.`:''}${ui.mapMode==='leaders'?'<br>미확정 시간대는 1표 이상 받은 1위 후보를 표시해요. 공동 1위는 먼저 등록된 후보가 대표로 표시돼요.':''}</p><div class="routes">${route.map((r,i)=>`${i?`<div class="route-transfer">${icon('arrow')}${link(M.directionsUrl(route[i-1].candidate,r.candidate,ui.travelmode),'Google에서 이동시간 확인 '+icon('external'))}${r.slot.transfer?`<span>· 메모: ${e(r.slot.transfer)}</span>`:''}</div>`:''}<article class="route-card"><span class="route-num">${r.index}</span><div class="route-text"><small>${r.slot.start}–${r.slot.end} · ${slotMeta(r.slot.id).label}</small><h3>${e(r.candidate.title)}</h3><p>${r.slot.confirmedId===r.candidate.id?'확정 일정':'상위 후보 · 미확정'}${r.candidate.lat===null?' · 좌표 미입력':''}</p></div><button type="button" class="btn secondary small" data-action="detail" data-id="${e(r.candidate.id)}">자세히 ${icon('chevron',true)}</button></article>`).join('')}</div>`;}
   function bottomNav(){return `<nav class="bottom-nav" aria-label="모바일 주 메뉴">${navButton('board','일정','board')}${navButton('candidates','후보','list')}<button type="button" class="nav-add" data-action="add" aria-label="일정 후보 추가">${icon('plus')}<span>추가</span></button>${navButton('map','지도','map')}${navButton('mine','내 투표','heart')}</nav>`;}
+  function joinScreen(){return `<main class="join-page"><section class="join-card">${brand()}<div class="join-art">${icon('plane')}</div><div class="eyebrow">PRIVATE TRIP BOARD</div><h1>우리들의 오사카</h1><p>함께 가는 다섯 명만 들어올 수 있어요.<br>받은 초대 코드를 입력해주세요.</p>${remoteError?`<div class="info-box warning">${e(remoteError)}</div>`:''}<form data-form="join" class="join-form"><label for="join-token">초대 코드</label><input id="join-token" name="token" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="os26_…" required maxlength="100"><button type="submit" class="btn primary full">여행 보드 들어가기 ${icon('arrow',true)}</button></form><small>초대 코드는 이 브라우저에만 저장돼요. 친구마다 서로 다른 코드를 사용합니다.</small></section></main>`;}
   function render(){
     if(mapInstance){mapInstance.remove();mapInstance=null;}
+    if(remoteMode&&!remoteReady){$('#app').innerHTML=joinScreen();return;}
     const focus=document.activeElement,focusId=focus?.id;
     const focusKeys=focus?.dataset?Object.fromEntries(Object.entries(focus.dataset)):null;
     const serial=++renderSerial;
@@ -898,9 +1082,16 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
     const editing=!!c,dId=c?.dayId||ui.day,d=state.days.find(d=>d.id===dId),available=d.slots.filter(s=>s.enabled),sId=c?.slotId||(available.some(s=>s.id===slotId)?slotId:available[0]?.id||'');
     return modalFrame(editing?'아이디어 다듬기':'우리, 여기 어때요?','장소 하나가 여행의 시작이 될 수 있어요.',`<form data-form="candidate" id="candidate-form"><input type="hidden" name="id" value="${e(c?.id||'')}"><div class="form-grid"><div class="field"><label for="candidate-day">언제 갈까요?</label><select id="candidate-day" name="dayId" ${editing?'disabled':''}>${options(DAYS.map(d=>[d.id,shortDate(d.id)+' '+d.ko]),dId)}</select></div><div class="field"><label for="candidate-slot">어느 시간대에?</label><select id="candidate-slot" name="slotId" ${editing?'disabled':''} required>${options((editing?d.slots:available).map(s=>[s.id,slotMeta(s.id).label+' · '+s.start]),sId)}</select></div></div><div class="field" style="margin-top:18px"><label for="candidate-title">장소명 <span>*</span></label><input id="candidate-title" name="title" maxlength="100" value="${e(c?.title||'')}" placeholder="가고 싶은 장소나 음식점 이름" required></div><div class="form-grid"><div class="field"><label for="candidate-category">카테고리 <span>*</span></label><select id="candidate-category" name="category" required>${options(Object.entries(M.CATEGORIES),c?.category||(['breakfast','lunch','dinner'].includes(sId)?'meal':'sight'))}</select></div><div class="field"><label for="candidate-weather">날씨와의 궁합</label><select id="candidate-weather" name="weather">${options(Object.entries(WEATHER),c?.weather||'any')}</select></div></div><div class="map-input-box"><div class="field"><label for="candidate-maps">Google 지도 링크 <span>*</span></label><input id="candidate-maps" type="url" name="mapsUrl" maxlength="2000" value="${e(c?.mapsUrl||'')}" placeholder="Google 지도에서 복사한 공유 링크" required></div><div class="link-tools"><button type="button" class="text-btn" data-action="map-search">${icon('search',true)}Google 지도에서 검색 ${icon('external',true)}</button><button type="button" class="text-btn" data-action="generate-link">검색 링크 사용하기</button></div><p class="field-help">Google 지도 검색 → 장소 선택 → 공유 링크를 붙여넣어요.<br>자동 완성·주소·평점·사진 자동 수집은 아직 연결되지 않았어요.</p></div><div class="field"><label for="candidate-address">주소 / 동네 <span class="muted">선택</span></label><input id="candidate-address" name="address" maxlength="300" value="${e(c?.address||'')}" placeholder="정확한 주소나 동네를 남겨주세요"></div><div class="field"><label for="candidate-description">한마디 추천</label><textarea id="candidate-description" name="description" maxlength="2000" placeholder="어떤 점이 좋은지, 같이 무엇을 하면 좋을지 알려줘요.">${e(c?.description||'')}</textarea></div><div class="form-grid"><div class="field"><label for="candidate-cost">예상 비용 / 1인 · 엔</label><input id="candidate-cost" name="cost" type="number" inputmode="decimal" min="0" max="10000000" step="0.01" value="${e(c?.cost??'')}" placeholder="무료는 0, 모르면 빈칸"></div><div class="field"><label for="candidate-duration">예상 체류시간 · 분</label><input id="candidate-duration" name="duration" type="number" inputmode="numeric" min="0" max="1440" step="1" value="${e(c?.duration??'')}" placeholder="예: 90"></div></div><label class="check-label" style="margin-top:10px"><input name="reservation" type="checkbox" ${c?.reservation?'checked':''}>미리 예약해야 해요</label><details class="advanced"><summary>사진 · 지도 좌표 추가하기 <span class="muted">선택</span></summary><div class="field"><label for="candidate-photo">사진 URL</label><input id="candidate-photo" name="photoUrl" type="url" maxlength="2000" value="${e(c?.photoUrl||'')}" placeholder="직접 사용 가능한 이미지의 https:// 주소"><p class="field-help">사진 URL의 제공자에게 브라우저의 요청이 전송돼요. 사진을 사용할 권리가 있는지 확인해주세요.</p></div><div class="form-grid"><div class="field"><label for="candidate-lat">위도</label><input id="candidate-lat" name="lat" type="number" step="any" min="-90" max="90" value="${e(c?.lat??'')}" placeholder="예: 34.6937"></div><div class="field"><label for="candidate-lng">경도</label><input id="candidate-lng" name="lng" type="number" step="any" min="-180" max="180" value="${e(c?.lng??'')}" placeholder="예: 135.5023"></div></div><p class="field-help" style="margin-top:10px">전체 지도에 핀을 표시하려면 위도·경도가 필요해요. 지도 링크에 실제 장소 좌표가 있으면 자동으로 채워져요. 짧은 공유 링크나 지도 화면 중심 좌표는 자동 변환하지 않아요.</p></details><div class="dialog-actions">${btn('취소','close-modal','','secondary')}<button class="btn primary" type="submit">${icon(editing?'check':'plus',true)}${editing?'수정 저장':'후보 남기기'}</button></div></form>`);
   }
-  function participantModal(){return modalFrame('지금 누구의 취향인가요?','5명의 참여자를 바꿔가며 투표를 체험할 수 있어요.',`<div class="info-box">이름 선택은 로그인이나 본인 인증이 아니에요. 실제 공동 사용을 위한 계정·권한은 아직 연결되지 않았어요.</div><div class="participant-list">${state.participants.map(p=>`<button type="button" class="participant-choice ${p.id===actor?'active':''}" data-action="select-person" data-person="${p.id}" aria-pressed="${p.id===actor}">${avatar(p.id)}<span class="name">${e(p.name)}</span>${p.id===actor?icon('check'):icon('chevron')}</button>`).join('')}</div><div class="dialog-actions">${btn('참여자 이름 바꾸기','settings','','secondary')}</div>`);}
+  function participantModal(){
+    if(remoteMode&&!demo)return modalFrame('함께 가는 사람들','초대 코드마다 한 사람의 권한이 연결돼요.',`<div class="info-box">현재 <b>${e(name(actor))}</b>님으로 참여 중이에요. 다른 사람 이름으로 임의 전환할 수 없어요.</div><div class="participant-list">${state.participants.map(p=>`<div class="participant-choice ${p.id===actor?'active':''}">${avatar(p.id)}<span class="name">${e(p.name)}</span>${p.id===actor?icon('check'):''}</div>`).join('')}</div><div class="dialog-actions">${btn('내 정보 · 백업','settings','','secondary')}</div>`);
+    return modalFrame('지금 누구의 취향인가요?','5명의 참여자를 바꿔가며 투표를 체험할 수 있어요.',`<div class="info-box">로컬 체험 모드에서는 참여자를 바꿔 기능을 확인할 수 있어요.</div><div class="participant-list">${state.participants.map(p=>`<button type="button" class="participant-choice ${p.id===actor?'active':''}" data-action="select-person" data-person="${p.id}" aria-pressed="${p.id===actor}">${avatar(p.id)}<span class="name">${e(p.name)}</span>${p.id===actor?icon('check'):icon('chevron')}</button>`).join('')}</div><div class="dialog-actions">${btn('참여자 이름 바꾸기','settings','','secondary')}</div>`);
+  }
   function dayModal(){const d=day();return modalFrame('우리 일정에 맞게 조절해요',`11월 ${Number(meta(ui.day).num)}일 ${meta(ui.day).ko} · 시간은 현지 시각 기준`,`${d.locked?'<div class="info-box warning">잠금 상태예요. 변경하려면 아래에서 잠금을 해제해주세요.</div>':'<div class="info-box">첫날·마지막 날에는 필요한 시간대만 켜주세요. 시간대를 꺼도 후보와 투표는 삭제되지 않아요. 같은 시간대의 후보는 해당 시작·종료 시간을 함께 사용해요.</div>'}<form data-form="day"><fieldset ${d.locked?'disabled':''} style="border:0;padding:0;margin:0;min-width:0"><div class="field"><label for="day-status">오늘의 진행 상태</label><select id="day-status" name="status">${options(Object.entries(STATUS),d.status)}</select><p class="field-help">사용하는 모든 시간대에 일정이 선택되어야 ‘일정 확정’으로 표시할 수 있어요.</p></div>${d.slots.map(s=>`<div class="day-setting-row"><div class="day-setting-title"><label class="check-label"><input type="checkbox" name="enabled-${s.id}" ${s.enabled?'checked':''}>${slotMeta(s.id).icon} ${slotMeta(s.id).label}</label><span class="badge gray">${candidates(d.id,s.id).length}개 후보</span></div><div class="time-row"><label class="sr-only" for="start-${s.id}">${slotMeta(s.id).label} 시작 시간</label><input id="start-${s.id}" name="start-${s.id}" type="time" value="${s.start}" required><span class="muted">—</span><label class="sr-only" for="end-${s.id}">${slotMeta(s.id).label} 종료 시간</label><input id="end-${s.id}" name="end-${s.id}" type="time" value="${s.end}" required></div><label class="sr-only" for="transfer-${s.id}">${slotMeta(s.id).label} 이전 장소에서 이동 메모</label><input class="transfer-input" id="transfer-${s.id}" name="transfer-${s.id}" maxlength="120" value="${e(s.transfer)}" placeholder="이전 장소에서 이동 메모 (선택)"></div>`).join('')}</fieldset><div class="dialog-actions">${d.locked?btn(icon('unlock',true)+' 일정 잠금 해제','unlock','','primary'):`<button type="submit" name="mode" value="lock" class="btn secondary">${icon('lock',true)}저장 후 잠그기</button><button type="submit" name="mode" value="save" class="btn primary">${icon('check',true)}설정 저장</button>`}</div></form>`);}
-  function settingsModal(){return modalFrame('우리 보드의 설정','이름을 정하고, 소중한 아이디어를 보관해요.',`<form data-form="participants"><h3 class="subhead" style="margin-top:0">함께 가는 사람들</h3>${state.participants.map(p=>`<div class="participant-edit">${avatar(p.id)}<div class="field"><label class="sr-only" for="name-${p.id}">참여자 ${p.id.slice(1)} 이름</label><input id="name-${p.id}" name="${p.id}" maxlength="24" value="${e(p.name)}" required></div></div>`).join('')}<div class="dialog-actions" style="margin-top:12px"><button type="submit" class="btn primary small">참여자 이름 저장</button></div></form><section class="settings-section"><h3>${icon('download',true)} 백업 · 다른 기기로 옮기기</h3><p>현재 버전은 이 브라우저의 저장소를 사용해요. JSON 파일을 주고받아 보드를 옮길 수 있지만, <b>동시 편집·실시간 공유·자동 병합은 지원하지 않아요.</b> 가져오기는 현재 보드를 덮어쓰니 먼저 백업해주세요.</p><div class="settings-buttons">${btn(icon('download',true)+' JSON 백업','export','','secondary small')}<label class="btn secondary small import-label">${icon('upload',true)}JSON 가져오기<input id="import-file" type="file" accept="application/json,.json" class="sr-only"></label></div><p style="margin-top:10px">파일에는 참여자 이름, 댓글, 예약 메모가 포함돼요. 공유할 내용을 먼저 확인해주세요.</p></section><section class="settings-section"><h3>${icon('map',true)} 지도 기능 안내</h3><p>Google 지도 검색·장소 링크·구간별 길찾기가 연결되어 있어요. 전체 지도는 인터넷 연결 시 OpenStreetMap에 좌표가 있는 일정만 표시해요. 평점·사진 자동 수집, 자동 이동시간 계산은 아직 제공하지 않아요.</p></section><section class="settings-section"><h3>샘플 보드로 체험하기</h3><p>예시 후보와 투표가 들어 있는 별도 화면을 체험해요. 원래 보드는 그대로 보관돼요.</p><div class="settings-buttons">${btn(demo?'내 보드로 돌아가기':'샘플로 둘러보기',demo?'exit-demo':'demo','','soft small')}</div></section>${corruptRaw&&!demo?`<section class="settings-section"><h3>저장 데이터 복구</h3><p>자동 저장을 중지하고 원본을 보호하고 있어요. 원본을 다운로드한 후 초기화할 수 있어요.</p><div class="settings-buttons">${btn('오류 원본 다운로드','export-corrupt','','secondary small')}</div></section>`:''}<section class="settings-section"><h3>보드 초기화</h3><p>현재 ${demo?'샘플':'브라우저의'} 보드에 있는 후보·투표·댓글·예약 메모를 모두 지워요.</p><div class="settings-buttons">${btn(icon('trash',true)+' 초기화','reset','','danger small')}</div></section>`);}
+  function settingsModal(){
+    const shared=remoteMode&&!demo;
+    const names=state.participants.map(p=>`<div class="participant-edit">${avatar(p.id)}<div class="field"><label class="sr-only" for="name-${p.id}">참여자 ${p.id.slice(1)} 이름</label><input id="name-${p.id}" name="${p.id}" maxlength="24" value="${e(p.name)}" required ${shared&&actor!=='p1'&&p.id!==actor?'disabled':''}></div></div>`).join('');
+    return modalFrame('우리 보드의 설정','이름을 정하고, 소중한 아이디어를 보관해요.',`<form data-form="participants"><h3 class="subhead" style="margin-top:0">함께 가는 사람들</h3>${names}<div class="dialog-actions" style="margin-top:12px"><button type="submit" class="btn primary small">${shared&&actor!=='p1'?'내 이름 저장':'참여자 이름 저장'}</button></div></form><section class="settings-section"><h3>${icon('download',true)} 백업 · 연결</h3><p>${shared?'현재 내용은 Supabase 공용 보드에 저장되고, 다른 기기의 변경을 몇 초마다 확인해요. JSON은 읽기 전용 백업으로 내려받을 수 있어요.':'현재 버전은 이 브라우저의 저장소를 사용해요. JSON 파일로 백업·복원할 수 있어요.'}</p><div class="settings-buttons">${btn(icon('download',true)+' JSON 백업','export','','secondary small')}${shared?btn('이 기기 연결 해제','disconnect','','secondary small'):`<label class="btn secondary small import-label">${icon('upload',true)}JSON 가져오기<input id="import-file" type="file" accept="application/json,.json" class="sr-only"></label>`}</div>${shared?'<p style="margin-top:10px">공용 보드에서는 안전한 병합을 위해 JSON 가져오기와 전체 초기화를 막아두었어요.</p>':'<p style="margin-top:10px">가져오기는 현재 보드를 전체 교체합니다.</p>'}</section><section class="settings-section"><h3>${icon('map',true)} 지도 기능 안내</h3><p>Google 지도 검색·장소 링크·구간별 길찾기가 연결되어 있어요. 전체 지도는 인터넷 연결 시 OpenStreetMap에 좌표가 있는 일정만 표시해요.</p></section><section class="settings-section"><h3>샘플 보드로 체험하기</h3><p>예시 후보와 투표가 들어 있는 별도 화면을 체험해요. 원래 보드는 그대로 보관돼요.</p><div class="settings-buttons">${btn(demo?'내 보드로 돌아가기':'샘플로 둘러보기',demo?'exit-demo':'demo','','soft small')}</div></section>${!shared?`<section class="settings-section"><h3>보드 초기화</h3><p>현재 브라우저의 후보·투표·댓글·예약 메모를 모두 지워요.</p><div class="settings-buttons">${btn(icon('trash',true)+' 초기화','reset','','danger small')}</div></section>`:''}`);
+  }
   function bookingsModal(){return modalFrame('여행의 기본 정보','이미 예약한 항공과 숙소 정보를 모아두세요.',`<div class="info-box">예약번호·여권번호 같은 민감한 정보는 넣지 않는 것을 권해요. 여기의 메모도 JSON 백업에 포함돼요.</div><form data-form="bookings"><div class="field"><label for="booking-flights">항공편</label><textarea id="booking-flights" name="flights" maxlength="3000" rows="5" placeholder="가는 편 / 오는 편, 항공편명과 현지 출발·도착 시간을 남겨요.">${e(state.bookings.flights)}</textarea></div><div class="field"><label for="booking-hotel">숙소</label><textarea id="booking-hotel" name="hotel" maxlength="3000" rows="5" placeholder="숙소 이름, 주소, 체크인·체크아웃 시간 등을 남겨요.">${e(state.bookings.hotel)}</textarea></div><div class="dialog-actions">${btn('취소','close-modal')}<button type="submit" class="btn primary">예약 정보 저장</button></div></form>`);}
   function detailModal(c){
     const d=state.days.find(d=>d.id===c.dayId),s=d.slots.find(s=>s.id===c.slotId),confirmed=s.confirmedId===c.id,rain=s.rainId===c.id;
@@ -921,8 +1112,34 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
   function ask(title,message,onConfirm,{label='확인',danger=false}={}){confirmHandler=onConfirm;$('#confirm-content').innerHTML=`<div class="dialog-head"><h2 id="confirm-title">${e(title)}</h2><button type="button" class="icon-btn" data-action="cancel-confirm" aria-label="취소">${icon('close')}</button></div><div class="dialog-body"><p style="font-size:13px;line-height:1.9;white-space:pre-line">${e(message)}</p><div class="dialog-actions">${btn('취소','cancel-confirm')}<button type="button" class="btn ${danger?'danger':'primary'}" data-action="accept-confirm">${e(label)}</button></div></div>`;const dlg=$('#confirm-dialog');if(!dlg.open)dlg.showModal();}
   function refreshDetail(keepDraft=true){if(modal?.kind==='detail'){const draft=keepDraft?$('#comment-text')?.value||'':'';openModal('detail',{id:modal.id},true);if(draft&&$('#comment-text')){$('#comment-text').value=draft;modal.dirty=true;}}}
   function withDiscard(fn){if(modal?.dirty)ask('저장하지 않은 내용이 있어요','이 화면을 나가면 작성 중인 내용은 사라져요.',fn,{label:'계속하기'});else fn();}
-  function setActor(id){if(!state.participants.some(p=>p.id===id))return;actor=id;try{sessionStorage.setItem(ACTOR_KEY,id);}catch{}closeModal();render();toast(name(id)+'님의 취향으로 참여해요.');}
+  function setActor(id){if(remoteMode&&!demo)return toast('공용 보드에서는 초대 코드에 연결된 참여자로만 사용할 수 있어요.');if(!state.participants.some(p=>p.id===id))return;actor=id;try{sessionStorage.setItem(ACTOR_KEY,id);}catch{}closeModal();render();toast(name(id)+'님의 취향으로 참여해요.');}
   function navigate(view){ui.view=view;render();window.scrollTo({top:0,behavior:'instant'});}
+  async function loadRemote({quiet=false}={}){
+    const next=await R.load();state=next;savedRaw=next.updatedAt;remoteReady=true;remoteError='';
+    if(!quiet)render();
+    return next;
+  }
+  async function connectRemote(token){
+    try{
+      remoteError='';render();
+      token=R.setToken(token);actor=await R.whoami(token);await loadRemote();
+      try{sessionStorage.setItem(ACTOR_KEY,actor);}catch{}
+      startPolling();toast(name(actor)+'님으로 공용 보드에 연결했어요.');
+    }catch(err){R.clearToken();remoteReady=false;remoteError=err.message||'초대 코드를 확인해주세요.';render();}
+  }
+  async function bootRemote(){
+    const token=R.getToken();if(!token){remoteReady=false;render();return;}
+    try{actor=await R.whoami(token);await loadRemote();startPolling();}
+    catch(err){R.clearToken();remoteReady=false;remoteError=err.message||'공용 보드에 연결하지 못했어요.';render();}
+  }
+  function startPolling(){
+    clearInterval(pollTimer);if(!remoteMode)return;
+    pollTimer=setInterval(async()=>{
+      if(!remoteReady||remoteSaving||demo||document.hidden||modal?.dirty)return;
+      try{const revision=await R.revision();if(revision&&revision!==savedRaw){const openDetail=modal?.kind==='detail'?modal.id:null;await loadRemote({quiet:true});render();if(openDetail&&byId(openDetail))openModal('detail',{id:openDetail});toast('친구가 바꾼 내용을 반영했어요.');}}
+      catch(err){remoteError=err.message||'동기화 확인에 실패했어요.';render();}
+    },5000);
+  }
   function downloadJSON(data,filename){const blob=new Blob([typeof data==='string'?data:JSON.stringify(data,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
   function backup(){downloadJSON(state,`${demo?'DEMO-':''}osaka-trip-${new Date().toISOString().replace(/[:.]/g,'-')}.json`);toast('JSON 백업 다운로드를 요청했어요. 다운로드 목록을 확인해주세요.');}
   function replacement(next,expected=savedRaw){
@@ -968,7 +1185,11 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
     if(storageIssue&&!demo&&!corruptRaw){showError('현재 저장되지 않은 내용이 있어요. 먼저 JSON 백업을 다운로드한 뒤 샘플을 체험해주세요.');return;}
     closeModal();demo=true;state=makeDemo();ui.day=DAYS[1].id;ui.view='board';ui.expanded=new Set(['morning','lunch']);render();window.scrollTo({top:0,behavior:'instant'});toast('샘플 체험을 시작했어요. 실제 보드는 그대로 보관돼요.');
   }
-  function exitDemo(){closeModal();demo=false;readState();ui.expanded.clear();ui.more.clear();ui.view='board';render();toast('원래 보드로 돌아왔어요. 샘플의 변경 내용은 옮겨지지 않아요.');}
+  function exitDemo(){
+    closeModal();demo=false;ui.expanded.clear();ui.more.clear();ui.view='board';
+    if(remoteMode){loadRemote().then(()=>toast('공용 보드로 돌아왔어요. 샘플의 변경 내용은 옮겨지지 않아요.')).catch(err=>{remoteError=err.message;render();});return;}
+    readState();render();toast('원래 보드로 돌아왔어요. 샘플의 변경 내용은 옮겨지지 않아요.');
+  }
   function updateCandidateSlots(){const form=$('#candidate-form');if(!form)return;const d=state.days.find(d=>d.id===form.elements.dayId.value),select=form.elements.slotId;select.innerHTML=options(d.slots.filter(s=>s.enabled).map(s=>[s.id,slotMeta(s.id).label+' · '+s.start]),'');if(d.locked)showError('이 날짜는 잠겨 있어요. 시간대 설정에서 먼저 잠금을 해제해주세요.');else if(!d.slots.some(s=>s.enabled))showError('이 날짜에 사용할 시간대를 먼저 켜주세요.');else{const error=$('#panel-dialog .form-error');if(error)error.textContent='';}}
   function fillCoordinates(){const f=$('#candidate-form');if(!f)return;const coords=M.coordinates(f.elements.mapsUrl.value);if(coords){f.elements.lat.value=coords.lat;f.elements.lng.value=coords.lng;toast('지도 링크의 장소 좌표를 채웠어요.');}else if(modal?.kind==='edit'&&f.elements.mapsUrl.value!==byId(modal.id)?.mapsUrl){f.elements.lat.value='';f.elements.lng.value='';toast('지도 링크가 바뀌어 이전 좌표를 지웠어요. 필요하면 새 장소의 좌표를 입력해주세요.');}}
   function revisionCheck(formKind){if(!demo&&modal&&modal.revision!==savedRaw&&['participants','day','bookings','candidate'].includes(formKind))throw new Error('이 화면을 연 뒤 다른 변경이 있었어요. 닫고 다시 열어 최신 내용을 확인해주세요.');}
@@ -978,13 +1199,14 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
       if(!f.reportValidity())return;
       revisionCheck(f.dataset.form);
       const fd=new FormData(f),value=k=>String(fd.get(k)??''),number=k=>value(k).trim()===''?null:Number(value(k));
+      if(f.dataset.form==='join'){connectRemote(value('token'));return;}
       if(f.dataset.form==='candidate'){
         const id=value('id'),old=byId(id),dId=old?.dayId||value('dayId'),slotId=old?.slotId||value('slotId'),coords=M.coordinates(value('mapsUrl'));
         const c={dayId:dId,slotId,title:value('title'),address:value('address'),mapsUrl:value('mapsUrl'),category:value('category'),weather:value('weather'),description:value('description'),photoUrl:value('photoUrl'),cost:number('cost'),duration:number('duration'),reservation:fd.has('reservation'),lat:number('lat'),lng:number('lng')};
         if(c.lat===null&&c.lng===null&&coords){c.lat=coords.lat;c.lng=coords.lng;}
         if(commit(id?{type:'edit',id,patch:c}:{type:'add',candidate:c},id?'후보를 수정했어요.':'새로운 아이디어를 남겼어요.')){ui.day=dId;ui.expanded.add(slotId);closeModal();render();}
       }else if(f.dataset.form==='participants'){
-        if(commit({type:'participants',names:state.participants.map(p=>value(p.id))},'함께 가는 사람들의 이름을 저장했어요.'))openModal('settings');
+        if(commit({type:'participants',names:state.participants.map(p=>value(p.id)||p.name)},'함께 가는 사람들의 이름을 저장했어요.'))openModal('settings');
       }else if(f.dataset.form==='bookings'){
         if(commit({type:'bookings',patch:{flights:value('flights'),hotel:value('hotel')}},'예약 정보를 저장했어요.'))closeModal();
       }else if(f.dataset.form==='day'){
@@ -1027,6 +1249,10 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
         if(a==='map-search')window.open(url,'_blank','noopener,noreferrer');
         else{f.elements.mapsUrl.value=url;modal.dirty=true;fillCoordinates();toast('장소명으로 검색하는 지도 링크를 넣었어요. 정확한 장소의 공유 링크로 바꿀 수도 있어요.');}
       }else if(a==='export')backup();
+      else if(a==='retry-sync'){remoteError='';bootRemote();}
+      else if(a==='disconnect'){
+        ask('이 기기의 연결을 해제할까요?','공용 보드 데이터는 삭제되지 않아요. 다시 들어오려면 이 참여자의 초대 코드가 필요합니다.',()=>{R.clearToken();remoteReady=false;remoteError='';actor='p1';closeModal();render();},{label:'연결 해제'});
+      }
       else if(a==='export-corrupt'){downloadJSON(corruptRaw,'osaka-trip-recovery-original.json');toast('보관 중인 오류 원본의 다운로드를 요청했어요.');}
       else if(a==='demo')withDiscard(enterDemo);
       else if(a==='exit-demo')withDiscard(exitDemo);
@@ -1087,7 +1313,7 @@ dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }
       if(points.length>1)mapInstance.fitBounds(L.latLngBounds(points),{padding:[35,35],maxZoom:15});mapInstance.invalidateSize();
     }catch(err){if(serial!==renderSerial||!$('#trip-map'))return;$('#trip-map').innerHTML=`<div class="map-placeholder">${icon('map')}<p>배경 지도를 불러오지 못했어요.<br>${e(err.message)}<br>아래 일정 목록과 Google 지도 링크는 그대로 사용할 수 있어요.</p></div>`;}
   }
-  render();
+  if(remoteMode)bootRemote();else render();
 })();
 </script>
 </body>

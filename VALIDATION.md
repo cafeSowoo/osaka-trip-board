@@ -4,6 +4,8 @@
 
 - 상태 모델 자동 검사: **16개 통과** (`tests/model.test.mjs`).
 - 실제 Chrome 브라우저 사용 흐름: **17개 통과**, 브라우저 JavaScript 예외 **0건** (`qa-output/browser-results.json`).
+- Supabase 공용 모드 실제 Chrome 검사: **초대 코드 인증 → 공용 보드 로드 → 후보 등록 → 다른 참여자 접속 → 투표 → 댓글 → 삭제·정리 통과** (`qa/remote-browser-check.cjs`).
+- RLS 위조 검사: p2 초대 코드로 `author_member_id=p1` 후보 등록을 시도하면 **HTTP 401 / RLS 거부** 확인.
 - 온라인 지도 확인: 샘플 확정 일정 **핀 2개**, 검사 당시 배경 지도 타일 **15개** 로드, JavaScript 예외 **0건** (`qa-output/online-map-results.json`).
 - 화면 폭 320·360·390·430·768·1024·1440px에서 메인 화면 가로 넘침 없음.
 - HTTP 서버 없이 `index.html`을 파일로 열어 후보를 저장하고, 새로고침 뒤 유지되는 것을 Chrome에서 확인.
@@ -24,9 +26,17 @@ JSON 다운로드·잘못된 가져오기 거부·확인 후 전체 교체,
 `qa-output/mobile-viewport.png`, `mobile-add-form.png`, `desktop-demo.png`, `desktop-map-online.png`를 생성하고 검토했습니다.
 작은 화면의 설명·행동 버튼 대비를 높였으며, 모바일 헤더와 여행 티켓 그림의 잘림을 조정했습니다.
 
+## 공용 데이터 검증
+
+- Supabase 프로젝트: `tennis-homepage-preview`; 신규 `osaka_trip_*` 테이블에만 작업.
+- 기본 데이터: 여행 1건, 참여자 5명, 날짜 3개, 시간대 24개.
+- 테스트 종료 후 후보·투표·PICK·댓글은 모두 **0건**으로 정리 확인.
+- 초대 코드 원문은 DB에 저장하지 않고 `private.osaka_trip_member_tokens`에 SHA-256 해시 5건만 보관.
+- 모든 공개 `osaka_trip_*` 테이블에 RLS 활성화. Supabase 보안 Advisor에서 이번 오사카 테이블 관련 보안 경고 없음.
+- 다른 참여자의 변경은 약 5초마다 revision을 확인하고 변경 시 전체 상태를 다시 불러오는 방식으로 검증. WebSocket Realtime은 사용하지 않음.
+
 ## 검증 범위 밖
 
-현재 앱에 실시간 공용 서버, 로그인, Google Places 자동 검색, 자동 이동시간 API가 없으므로
-여러 사람의 실제 휴대폰에서 동시에 편집하는 온라인 협업 기능을 검증한 것은 아닙니다.
+Supabase Auth 계정 로그인과 WebSocket Realtime은 사용하지 않습니다. 현재는 참여자별 초대 코드와 5초 주기 동기화를 사용합니다.
 Safari·Firefox 및 실제 Android/iOS 기기의 실기기 검사는 수행하지 않았습니다.
 샘플 위치·가격은 실제 장소에 대한 사실 검증이나 여행 추천이 아닙니다.
